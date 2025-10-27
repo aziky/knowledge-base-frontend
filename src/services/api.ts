@@ -1,0 +1,313 @@
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:7070';
+
+// Create base axios instance
+const createApiClient = (servicePath: string) => {
+  return axios.create({
+    baseURL: `${API_BASE_URL}/${servicePath}`,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 10000, // 10 seconds timeout
+  });
+};
+
+// Service-specific clients
+const userServiceClient = createApiClient('user-service/api');
+const projectServiceClient = createApiClient('project-service/api');
+const notificationServiceClient = createApiClient('notification-service/api');
+
+// API Response interface to match Java backend
+export interface ApiResponse<T = unknown> {
+  code: number;
+  message: string;
+  data: T | null;
+}
+
+// API Response helper functions (similar to Java static methods)
+export class ApiResponseHelper {
+  static success<T>(data: T, message = "Success"): ApiResponse<T> {
+    return {
+      code: 200,
+      message,
+      data
+    };
+  }
+
+  static successMessage(message: string): ApiResponse<null> {
+    return {
+      code: 200,
+      message,
+      data: null
+    };
+  }
+
+  static created<T>(data: T, message = "Created successfully"): ApiResponse<T> {
+    return {
+      code: 201,
+      message,
+      data
+    };
+  }
+
+  static createdMessage(message: string): ApiResponse<null> {
+    return {
+      code: 201,
+      message,
+      data: null
+    };
+  }
+
+  static badRequest(message: string): ApiResponse<null> {
+    return {
+      code: 400,
+      message,
+      data: null
+    };
+  }
+
+  static unauthorized(message: string): ApiResponse<null> {
+    return {
+      code: 401,
+      message,
+      data: null
+    };
+  }
+
+  static notFound(message: string): ApiResponse<null> {
+    return {
+      code: 404,
+      message,
+      data: null
+    };
+  }
+
+  static internalError(message = "Internal server error"): ApiResponse<null> {
+    return {
+      code: 500,
+      message,
+      data: null
+    };
+  }
+}
+
+// Types for authentication
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    name?: string;
+  };
+}
+
+export interface ApiError {
+  message: string;
+  status?: number;
+}
+
+// Types for projects
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+}
+
+// Authentication API functions (user-service)
+export const authApi = {
+  // Login function
+  login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
+    try {
+      const response = await userServiceClient.post<ApiResponse<LoginResponse>>('/auth/login', credentials);
+      const apiResponse = response.data;
+      
+      // Check if the API response indicates success
+      if (apiResponse.code === 200 && apiResponse.data) {
+        return apiResponse.data;
+      } else {
+        throw {
+          message: apiResponse.message || 'Login failed',
+          status: apiResponse.code,
+        } as ApiError;
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const apiResponse = error.response?.data as ApiResponse<null>;
+        throw {
+          message: apiResponse?.message || error.response?.data?.message || 'Login failed',
+          status: error.response?.status || apiResponse?.code,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Logout function (if needed)
+  logout: async (): Promise<void> => {
+    try {
+      await userServiceClient.post('/auth/logout');
+    } catch {
+      console.error('Logout error');
+    }
+  },
+
+  // Verify token function (for checking if user is still authenticated)
+  verifyToken: async (token: string): Promise<boolean> => {
+    try {
+      const response = await userServiceClient.get('/auth/verify', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.status === 200;
+    } catch {
+      return false;
+    }
+  },
+};
+
+// Project API functions (project-service)
+export const projectApi = {
+  // Get all projects
+  getProjects: async (): Promise<Project[]> => {
+    try {
+      const response = await projectServiceClient.get('/projects');
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to fetch projects',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Get single project
+  getProject: async (projectId: string): Promise<Project> => {
+    try {
+      const response = await projectServiceClient.get(`/projects/${projectId}`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to fetch project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Create new project
+  createProject: async (projectData: CreateProjectRequest): Promise<Project> => {
+    try {
+      const response = await projectServiceClient.post('/projects', projectData);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to create project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Update project
+  updateProject: async (projectId: string, projectData: Partial<CreateProjectRequest>): Promise<Project> => {
+    try {
+      const response = await projectServiceClient.put(`/projects/${projectId}`, projectData);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to update project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Delete project
+  deleteProject: async (projectId: string): Promise<void> => {
+    try {
+      await projectServiceClient.delete(`/projects/${projectId}`);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to delete project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+};
+
+// Function to add auth interceptors to a client
+const addAuthInterceptors = (client: ReturnType<typeof axios.create>) => {
+  // Add request interceptor to include auth token
+  client.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
+
+  // Add response interceptor to handle token expiration
+  client.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response?.status === 401) {
+        // Token expired or invalid, remove from storage
+        localStorage.removeItem('authToken');
+        // Optionally redirect to login page
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+  );
+};
+
+// Apply interceptors to all service clients
+addAuthInterceptors(userServiceClient);
+addAuthInterceptors(projectServiceClient);
+addAuthInterceptors(notificationServiceClient);
+
+// Export individual clients if needed
+export { userServiceClient, projectServiceClient, notificationServiceClient };
