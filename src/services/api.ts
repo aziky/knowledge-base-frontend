@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ApiResponse } from '@/types';
+import type { ApiResponse, Project, ProjectListResponse } from '@/types';
 
 const API_BASE_URL = 'http://localhost:7070';
 
@@ -105,14 +105,6 @@ export interface ApiError {
 }
 
 // Types for projects
-export interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface CreateProjectRequest {
   name: string;
   description?: string;
@@ -176,15 +168,26 @@ export const authApi = {
 // Project API functions (project-service)
 export const projectApi = {
   // Get all projects
-  getProjects: async (): Promise<Project[]> => {
+  getProjects: async (): Promise<ProjectListResponse> => {
     try {
-      const response = await projectServiceClient.get('/projects');
-      return response.data;
+      const response = await projectServiceClient.get<ApiResponse<ProjectListResponse>>('/project');
+      const apiResponse = response.data;
+      
+      // Check if the API response indicates success
+      if (apiResponse.code === 200 && apiResponse.data) {
+        return apiResponse.data;
+      } else {
+        throw {
+          message: apiResponse.message || 'Failed to fetch projects',
+          status: apiResponse.code,
+        } as ApiError;
+      }
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        const apiResponse = error.response?.data as ApiResponse<null>;
         throw {
-          message: error.response?.data?.message || 'Failed to fetch projects',
-          status: error.response?.status,
+          message: apiResponse?.message || error.response?.data?.message || 'Failed to fetch projects',
+          status: error.response?.status || apiResponse?.code,
         } as ApiError;
       }
       throw {

@@ -16,8 +16,18 @@ export interface ApiResponse<T> {
 // You can add more shared types here as your project grows
 export interface Project {
   id: string
-  name: string
-  description?: string
-  createdAt: string
-  updatedAt: string
+  projectName: string
+  projectRole: string
+  joinedAt: string
+  removedAt: string | null
+}
+
+export interface ProjectListResponse {
+  content: Project[]
+  pageNumber: number
+  pageSize: number
+  totalElements: number
+  totalPages: number
+  first: boolean
+  last: boolean
 }

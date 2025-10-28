@@ -1,4 +1,4 @@
-import { ProjectGrid } from "@/components/project-grid"
+import { ProjectTable } from "@/components/ProjectTable"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
 import { Button } from "@/components/ui/button"
 import type { User } from "@/types"
@@ -35,7 +35,7 @@ export default function HomePage({ user, onLogout }: HomePageProps) {
           <h2 className="text-xl font-semibold text-foreground">Your Projects</h2>
           <CreateProjectDialog />
         </div>
-        <ProjectGrid />
+        <ProjectTable />
       </div>
     </main>
   )
