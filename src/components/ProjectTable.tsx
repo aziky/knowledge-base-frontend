@@ -48,18 +48,60 @@ export function ProjectTable() {
   const columns: ColumnDef<Project>[] = [
     {
       accessorKey: "projectName",
-      header: "Project Name",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-semibold text-slate-700 hover:text-slate-900"
+        >
+          Project Name
+          <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
+        </Button>
+      ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("projectName")}</div>
+        <div className="flex items-center space-x-3">
+          <div>
+            <div className="font-semibold text-slate-900">{row.getValue("projectName")}</div>
+            <div className="text-sm text-slate-500">Project ID: {row.original.id.slice(0, 8)}...</div>
+          </div>
+        </div>
       ),
     },
     {
       accessorKey: "projectRole",
-      header: "Role",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-semibold text-slate-700 hover:text-slate-900"
+        >
+          Role
+          <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
+        </Button>
+      ),
       cell: ({ row }) => {
         const role = row.getValue("projectRole") as string
+        const getRoleColor = (role: string) => {
+          switch (role.toLowerCase()) {
+            case 'creator':
+              return 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
+            case 'admin':
+              return 'bg-gradient-to-r from-red-500 to-red-600 text-white'
+            case 'member':
+              return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+            default:
+              return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white'
+          }
+        }
         return (
-          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">
+          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getRoleColor(role)} shadow-sm`}>
+            <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
             {formatRole(role)}
           </span>
         )
@@ -67,21 +109,44 @@ export function ProjectTable() {
     },
     {
       accessorKey: "joinedAt",
-      header: "Joined Date",
-      cell: ({ row }) => <div>{row.getValue("joinedAt")}</div>,
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-semibold text-slate-700 hover:text-slate-900"
+        >
+          Joined Date
+          <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center space-x-2">
+          <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="text-slate-600">{row.getValue("joinedAt")}</span>
+        </div>
+      ),
     },
     {
       id: "actions",
-      header: () => <div className="text-right">Actions</div>,
+      header: () => <div className="text-right font-semibold text-slate-700">Actions</div>,
       cell: ({ row }) => {
         const project = row.original
         return (
-          <div className="text-right">
+          <div className="text-right space-x-2">
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => handleViewProject(project)}
+              className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300"
             >
+              <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
               View
             </Button>
           </div>
@@ -159,28 +224,36 @@ export function ProjectTable() {
   }
 
   return (
-    <div className="w-full space-y-4">
-      {/* Filters */}
-      <div className="flex items-center py-4">
-        <Input
-          placeholder="Filter projects..."
-          value={(table.getColumn("projectName")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("projectName")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
-        />
+    <div className="w-full space-y-6">
+      {/* Enhanced Search */}
+      <div className="flex items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <Input
+            placeholder="Search projects by name..."
+            value={(table.getColumn("projectName")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("projectName")?.setFilterValue(event.target.value)
+            }
+            className="pl-10 bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500 shadow-sm"
+          />
+        </div>
+        <div className="flex items-center space-x-2 text-sm text-slate-600">
+          <span>{table.getFilteredRowModel().rows.length} projects found</span>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-md border">
+      {/* Enhanced Table */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="border-b border-slate-200 py-4">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -199,9 +272,10 @@ export function ProjectTable() {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="hover:bg-slate-50/50 transition-colors border-b border-slate-100"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="py-4">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -214,9 +288,16 @@ export function ProjectTable() {
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-32 text-center"
                 >
-                  No results.
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
+                      <svg className="h-6 w-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div className="text-slate-500">No projects match your search</div>
+                  </div>
                 </TableCell>
               </TableRow>
             )}
