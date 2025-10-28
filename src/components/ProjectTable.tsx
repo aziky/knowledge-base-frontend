@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   flexRender,
   getCoreRowModel,
@@ -35,6 +36,7 @@ import { projectApi, type ApiError } from "@/services/api"
 import type { Project, ProjectListResponse } from "@/types"
 
 export function ProjectTable() {
+  const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -64,7 +66,7 @@ export function ProjectTable() {
         <div className="flex items-center space-x-3">
           <div>
             <div className="font-semibold text-slate-900">{row.getValue("projectName")}</div>
-            <div className="text-sm text-slate-500">Project ID: {row.original.id.slice(0, 8)}...</div>
+            <div className="text-sm text-slate-500">Project ID: {row.original.projectId.slice(0, 8)}...</div>
           </div>
         </div>
       ),
@@ -190,8 +192,7 @@ export function ProjectTable() {
   }
 
   const handleViewProject = (project: Project) => {
-    // TODO: Implement project view functionality
-    console.log('View project:', project)
+    navigate(`/project/${project.projectId}`)
   }
 
   if (loading) {

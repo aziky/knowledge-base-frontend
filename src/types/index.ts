@@ -15,7 +15,7 @@ export interface ApiResponse<T> {
 
 // You can add more shared types here as your project grows
 export interface Project {
-  id: string
+  projectId: string
   projectName: string
   projectRole: string
   joinedAt: string
@@ -30,4 +30,36 @@ export interface ProjectListResponse {
   totalPages: number
   first: boolean
   last: boolean
+}
+
+export interface Document {
+  id: string
+  fileName: string
+  fileType: string
+  uploadedAt: string
+  status: string
+}
+
+export interface Video {
+  id: string
+  fileName: string
+  fileType: string
+  uploadedAt: string
+  status: string
+}
+
+export interface Folder {
+  id: string
+  name: string
+  // Add more folder properties as needed
+}
+
+export interface ProjectDetails {
+  projectId: string
+  projectName: string
+  description: string
+  createdAt: string
+  folders: Folder[]
+  documents: Document[]
+  videos: Video[]
 }
