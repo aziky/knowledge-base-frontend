@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ApiResponse } from '@/types';
+import type { ApiResponse, Project, ProjectListResponse, ProjectDetails } from '@/types';
 
 const API_BASE_URL = 'http://localhost:7070';
 
@@ -105,14 +105,6 @@ export interface ApiError {
 }
 
 // Types for projects
-export interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface CreateProjectRequest {
   name: string;
   description?: string;
@@ -176,15 +168,26 @@ export const authApi = {
 // Project API functions (project-service)
 export const projectApi = {
   // Get all projects
-  getProjects: async (): Promise<Project[]> => {
+  getProjects: async (): Promise<ProjectListResponse> => {
     try {
-      const response = await projectServiceClient.get('/projects');
-      return response.data;
+      const response = await projectServiceClient.get<ApiResponse<ProjectListResponse>>('/project');
+      const apiResponse = response.data;
+      
+      // Check if the API response indicates success
+      if (apiResponse.code === 200 && apiResponse.data) {
+        return apiResponse.data;
+      } else {
+        throw {
+          message: apiResponse.message || 'Failed to fetch projects',
+          status: apiResponse.code,
+        } as ApiError;
+      }
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        const apiResponse = error.response?.data as ApiResponse<null>;
         throw {
-          message: error.response?.data?.message || 'Failed to fetch projects',
-          status: error.response?.status,
+          message: apiResponse?.message || error.response?.data?.message || 'Failed to fetch projects',
+          status: error.response?.status || apiResponse?.code,
         } as ApiError;
       }
       throw {
@@ -193,16 +196,27 @@ export const projectApi = {
     }
   },
 
-  // Get single project
-  getProject: async (projectId: string): Promise<Project> => {
+  // Get project details with files
+  getProjectDetails: async (projectId: string): Promise<ProjectDetails> => {
     try {
-      const response = await projectServiceClient.get(`/projects/${projectId}`);
-      return response.data;
+      const response = await projectServiceClient.get<ApiResponse<ProjectDetails>>(`/project/${projectId}`);
+      const apiResponse = response.data;
+      
+      // Check if the API response indicates success
+      if (apiResponse.code === 200 && apiResponse.data) {
+        return apiResponse.data;
+      } else {
+        throw {
+          message: apiResponse.message || 'Failed to fetch project details',
+          status: apiResponse.code,
+        } as ApiError;
+      }
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        const apiResponse = error.response?.data as ApiResponse<null>;
         throw {
-          message: error.response?.data?.message || 'Failed to fetch project',
-          status: error.response?.status,
+          message: apiResponse?.message || error.response?.data?.message || 'Failed to fetch project details',
+          status: error.response?.status || apiResponse?.code,
         } as ApiError;
       }
       throw {
@@ -214,7 +228,7 @@ export const projectApi = {
   // Create new project
   createProject: async (projectData: CreateProjectRequest): Promise<Project> => {
     try {
-      const response = await projectServiceClient.post('/projects', projectData);
+      const response = await projectServiceClient.post('/project', projectData);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -232,7 +246,7 @@ export const projectApi = {
   // Update project
   updateProject: async (projectId: string, projectData: Partial<CreateProjectRequest>): Promise<Project> => {
     try {
-      const response = await projectServiceClient.put(`/projects/${projectId}`, projectData);
+      const response = await projectServiceClient.put(`/project/${projectId}`, projectData);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -250,7 +264,7 @@ export const projectApi = {
   // Delete project
   deleteProject: async (projectId: string): Promise<void> => {
     try {
-      await projectServiceClient.delete(`/projects/${projectId}`);
+      await projectServiceClient.delete(`/project/${projectId}`);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw {

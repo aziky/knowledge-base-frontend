@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import LoginPage from "@/pages/login/LoginPage"
 import { authApi } from "@/services/api"
 import HomePage from "@/pages/home/HomePage"
+import ProjectDetailsPage from "@/pages/project/ProjectDetailsPage"
 import type { User } from "@/types"
 
 function App() {
@@ -73,6 +74,18 @@ function App() {
           element={
             isAuthenticated ? (
               <HomePage user={user} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        {/* Project details route */}
+        <Route
+          path="/project/:projectId"
+          element={
+            isAuthenticated ? (
+              <ProjectDetailsPage />
             ) : (
               <Navigate to="/login" replace />
             )
