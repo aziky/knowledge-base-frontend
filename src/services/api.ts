@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { ApiResponse } from '@/types';
 
 const API_BASE_URL = 'http://localhost:7070';
 
@@ -17,13 +18,6 @@ const createApiClient = (servicePath: string) => {
 const userServiceClient = createApiClient('user-service/api');
 const projectServiceClient = createApiClient('project-service/api');
 const notificationServiceClient = createApiClient('notification-service/api');
-
-// API Response interface to match Java backend
-export interface ApiResponse<T = unknown> {
-  code: number;
-  message: string;
-  data: T | null;
-}
 
 // API Response helper functions (similar to Java static methods)
 export class ApiResponseHelper {
@@ -100,11 +94,9 @@ export interface LoginCredentials {
 
 export interface LoginResponse {
   token: string;
-  user: {
-    id: string;
-    email: string;
-    name?: string;
-  };
+  role: string;
+  fullName: string;
+  email: string;
 }
 
 export interface ApiError {

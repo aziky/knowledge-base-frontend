@@ -1,69 +1,69 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authApi } from '@/services/api';
 import type { LoginCredentials, ApiError } from '@/services/api';
+import type { User } from '@/types';
 
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-  role?: string;
-}
-
-
-// Define DTO
 interface LoginProps {
-  // Define function to handle response
   onLoginSuccess?: (token: string, user: User) => void;
   onLoginError?: (error: string) => void;
 }
 
 const LoginPage: React.FC<LoginProps> = ({ onLoginSuccess, onLoginError }) => {
-  
-  // Initialize state with empty field
+  const navigate = useNavigate();
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
     password: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string>('');
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setCredentials(prev => ({
-      ...prev,
-      [name]: value,
-    }));
-    // Clear error when user starts typing
-    if (error) {
-      setError('');
-    }
-  };
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setError('');
+    setLoading(true);
+
     // Basic validation
     if (!credentials.email || !credentials.password) {
       setError('Please fill in all fields');
+      setLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    setError('');
+    if (!credentials.email.includes('@')) {
+      setError('Please enter a valid email');
+      setLoading(false);
+      return;
+    }
 
     try {
+      // Call the actual API
       const response = await authApi.login(credentials);
       
-      // Store token in localStorage
-      localStorage.setItem('authToken', response.token);
-      
-      // Call success callback
+      // Map the API response to our User interface
+      const authToken = response.token;
+      const userData: User = {
+        id: response.email, // Using email as ID since backend doesn't provide separate ID
+        email: response.email,
+        name: response.fullName,
+        role: response.role
+      };
+
+      // Store token and user data in localStorage
+      localStorage.setItem('authToken', authToken);
+      localStorage.setItem('userData', JSON.stringify(userData));
+
+      // Call success callback to parent component (App.tsx)
       if (onLoginSuccess) {
-        onLoginSuccess(response.token, response.user);
+        onLoginSuccess(authToken, userData);
       }
-      
-      console.log('Login successful:', response.user);
+
+      // Navigate to main page (React Router will handle this automatically via App.tsx)
+      console.log('Login successful!', userData);
+      navigate('/');
     } catch (err) {
       const apiError = err as ApiError;
       const errorMessage = apiError.message || 'Login failed. Please try again.';
@@ -74,90 +74,61 @@ const LoginPage: React.FC<LoginProps> = ({ onLoginSuccess, onLoginError }) => {
         onLoginError(errorMessage);
       }
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-gray-50 p-4 fixed inset-0">
-      <div className="w-full max-w-md space-y-8">
-        <div className="bg-white rounded-lg shadow-md p-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-extrabold text-gray-900">
-              Sign in to your account
-            </h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Enter your credentials to access the Knowledge Base
-            </p>
-          </div>
-          
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your email"
-                  value={credentials.email}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your password"
-                  value={credentials.password}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                />
-              </div>
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-2xl">Welcome Back</CardTitle>
+          <CardDescription>Sign in to your account to continue</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
+                Email
+              </label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                value={credentials.email}
+                onChange={(e) => setCredentials(prev => ({ ...prev, email: e.target.value }))}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
+                Password
+              </label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                value={credentials.password}
+                onChange={(e) => setCredentials(prev => ({ ...prev, password: e.target.value }))}
+                disabled={loading}
+              />
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <div className="text-sm text-red-700">{error}</div>
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive">{error}</p>
               </div>
             )}
 
-            <div>
-              <Button
-                type="submit"
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <span className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Signing in...
-                  </span>
-                ) : (
-                  'Sign in'
-                )}
-              </Button>
-            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
+            </Button>
           </form>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
