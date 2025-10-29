@@ -31,7 +31,7 @@ export default function HomePage({ user, onLogout }: HomePageProps) {
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
                   Knowledge Base
                 </h1>
-                <p className="text-slate-600 mt-1">Welcome back, {user.name || user.email}</p>
+                <p className="text-slate-600 mt-1">Welcome back, {user.fullName || user.email}</p>
               </div>
             </div>
             
