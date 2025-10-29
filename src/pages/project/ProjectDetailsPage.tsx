@@ -2,8 +2,10 @@ import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { projectApi, type ApiError } from "@/services/api"
-import type { ProjectDetails, Document, Video } from "@/types"
+import type { ProjectDetails, Member } from "@/types"
 
 export default function ProjectDetailsPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -11,6 +13,23 @@ export default function ProjectDetailsPage() {
   const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Pagination and search states
+  const [filesPage, setFilesPage] = useState(1)
+  const [filesSearch, setFilesSearch] = useState("")
+  const [fileTypeFilter, setFileTypeFilter] = useState<"all" | "document" | "video">("all")
+  const itemsPerPage = 10
+
+  // Unified file interface
+  interface UnifiedFile {
+    id: string
+    fileName: string
+    fileType: string
+    uploadedBy?: string
+    uploadedAt: string
+    status: string
+    type: "document" | "video"
+  }
 
   useEffect(() => {
     if (projectId) {
@@ -22,7 +41,7 @@ export default function ProjectDetailsPage() {
     try {
       setLoading(true)
       setError(null)
-      const details = await projectApi.getProjectDetails(id)
+      const details = await projectApi.getProjectDetails(id)      
       setProjectDetails(details)
     } catch (err) {
       const apiError = err as ApiError
@@ -36,48 +55,152 @@ export default function ProjectDetailsPage() {
     return new Date(dateString).toLocaleString()
   }
 
+  // Filter and pagination helpers
+  const getAllFiles = (): UnifiedFile[] => {
+    if (!projectDetails) return []
+    
+    const documents: UnifiedFile[] = projectDetails.documents.map(doc => ({
+      ...doc,
+      type: "document" as const
+    }))
+    
+    const videos: UnifiedFile[] = projectDetails.videos.map(video => ({
+      ...video,
+      type: "video" as const
+    }))
+    
+    return [...documents, ...videos].sort((a, b) => 
+      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    )
+  }
+
+  const filterFiles = (files: UnifiedFile[]) => {
+    let filtered = files.filter(file => 
+      file.fileName.toLowerCase().includes(filesSearch.toLowerCase()) ||
+      file.uploadedBy?.toLowerCase().includes(filesSearch.toLowerCase())
+    )
+
+    if (fileTypeFilter !== "all") {
+      filtered = filtered.filter(file => file.type === fileTypeFilter)
+    }
+
+    return filtered
+  }
+
+  const paginateItems = <T,>(items: T[], page: number, perPage: number) => {
+    const startIndex = (page - 1) * perPage
+    return items.slice(startIndex, startIndex + perPage)
+  }
+
   const getFileIcon = (fileType: string) => {
     const type = fileType.toLowerCase()
     if (type.includes('pdf')) {
       return (
-        <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M8.267 14.68c-.184 0-.308.018-.372.036v1.178c.076.018.171.023.302.023.479 0 .774-.242.774-.651 0-.366-.254-.586-.704-.586zm3.487.012c-.2 0-.33.018-.407.036v2.61c.077.018.201.018.313.018.817.006 1.349-.444 1.349-1.396.006-.83-.479-1.268-1.255-1.268z"/>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-        </svg>
+        <div className="flex items-center justify-center w-8 h-8 rounded bg-red-100">
+          <svg className="h-4 w-4 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+          </svg>
+        </div>
       )
     } else if (type.includes('doc')) {
       return (
-        <svg className="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-          <path d="M14 2v6h6"/>
-        </svg>
+        <div className="flex items-center justify-center w-8 h-8 rounded bg-blue-100">
+          <svg className="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+          </svg>
+        </div>
       )
     } else if (type.includes('mp4') || type.includes('video')) {
       return (
-        <svg className="h-5 w-5 text-purple-500" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M8 5v14l11-7z"/>
-        </svg>
+        <div className="flex items-center justify-center w-8 h-8 rounded bg-purple-100">
+          <svg className="h-4 w-4 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </div>
+      )
+    } else if (type.includes('png') || type.includes('jpg') || type.includes('image')) {
+      return (
+        <div className="flex items-center justify-center w-8 h-8 rounded bg-green-100">
+          <svg className="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
       )
     }
     return (
-      <svg className="h-5 w-5 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-      </svg>
+      <div className="flex items-center justify-center w-8 h-8 rounded bg-gray-100">
+        <svg className="h-4 w-4 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+        </svg>
+      </div>
     )
   }
 
+  // Simple pagination component
+  const SimplePagination = ({ 
+    currentPage, 
+    totalPages, 
+    onPageChange, 
+    totalItems 
+  }: {
+    currentPage: number
+    totalPages: number
+    onPageChange: (page: number) => void
+    totalItems: number
+  }) => (
+    <div className="flex items-center justify-between">
+      <div className="text-sm text-slate-600">
+        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} items
+      </div>
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+        >
+          Previous
+        </Button>
+        <div className="flex items-center space-x-1">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <Button
+              key={page}
+              variant={page === currentPage ? "default" : "outline"}
+              size="sm"
+              onClick={() => onPageChange(page)}
+              className="w-8 h-8"
+            >
+              {page}
+            </Button>
+          ))}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  )
+
   const getStatusBadge = (status: string) => {
-    const statusLower = status.toLowerCase()
+    const statusUpper = status.toUpperCase()
     let colorClasses = ""
     
-    switch (statusLower) {
-      case 'completed':
+    switch (statusUpper) {
+      case 'APPROVED':
         colorClasses = "bg-green-100 text-green-800 border-green-200"
         break
-      case 'processing':
+      case 'PENDING':
         colorClasses = "bg-yellow-100 text-yellow-800 border-yellow-200"
         break
-      case 'failed':
+      case 'REVIEW':
+        colorClasses = "bg-blue-100 text-blue-800 border-blue-200"
+        break
+      case 'REJECTED':
         colorClasses = "bg-red-100 text-red-800 border-red-200"
         break
       default:
@@ -85,7 +208,7 @@ export default function ProjectDetailsPage() {
     }
 
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorClasses}`}>
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${colorClasses}`}>
         {status}
       </span>
     )
@@ -195,100 +318,217 @@ export default function ProjectDetailsPage() {
           </CardHeader>
         </Card>
 
-        {/* Files Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Documents */}
+        {/* Files Section */}
+        <div className="space-y-8">
+          {/* Unified Files */}
           <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
             <CardHeader className="border-b border-slate-200">
-              <CardTitle className="flex items-center text-xl">
-                <svg className="h-5 w-5 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Documents ({projectDetails.documents.length})
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center text-xl">
+                  <svg className="h-5 w-5 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Files ({(projectDetails.documents.length + projectDetails.videos.length)})
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  {/* Type Filter Buttons */}
+                  <div className="flex items-center space-x-1 border border-slate-200 rounded-lg p-1">
+                    <Button
+                      variant={fileTypeFilter === "all" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setFileTypeFilter("all")}
+                      className="h-8"
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={fileTypeFilter === "document" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setFileTypeFilter("document")}
+                      className="h-8"
+                    >
+                      Documents
+                    </Button>
+                    <Button
+                      variant={fileTypeFilter === "video" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setFileTypeFilter("video")}
+                      className="h-8"
+                    >
+                      Videos
+                    </Button>
+                  </div>
+                  <Input
+                    placeholder="Search files..."
+                    value={filesSearch}
+                    onChange={(e) => setFilesSearch(e.target.value)}
+                    className="w-64"
+                  />
+                  <Button variant="outline" size="sm">
+                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add File
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
-              {projectDetails.documents.length > 0 ? (
-                <div className="divide-y divide-slate-100">
-                  {projectDetails.documents.map((doc: Document) => (
-                    <div key={doc.id} className="p-4 hover:bg-slate-50/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          {getFileIcon(doc.fileType)}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{doc.fileName}</p>
-                            <p className="text-xs text-slate-500">Uploaded: {formatDate(doc.uploadedAt)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {getStatusBadge(doc.status)}
-                          <Button variant="ghost" size="sm">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                          </Button>
-                        </div>
-                      </div>
+              {(projectDetails.documents.length + projectDetails.videos.length) > 0 ? (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="w-24">Type</TableHead>
+                        <TableHead className="w-32">Uploaded By</TableHead>
+                        <TableHead className="w-40">Upload Date</TableHead>
+                        <TableHead className="w-24">Status</TableHead>
+                        <TableHead className="w-16"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginateItems(filterFiles(getAllFiles()), filesPage, itemsPerPage).map((file: UnifiedFile) => (
+                        <TableRow key={file.id} className="hover:bg-slate-50/50">
+                          <TableCell className="align-middle">{getFileIcon(file.fileType)}</TableCell>
+                          <TableCell className="align-middle">
+                            <div className="font-medium text-slate-900 truncate max-w-xs" title={file.fileName}>
+                              {file.fileName}
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-middle">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+                              file.type === 'document' 
+                                ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                                : 'bg-purple-100 text-purple-800 border-purple-200'
+                            }`}>
+                              {file.type === 'document' ? 'Document' : 'Video'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="align-middle">
+                            {file.uploadedBy ? (
+                              <div className="flex items-center space-x-2">
+                                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                <span className="text-sm text-slate-600 truncate" title={file.uploadedBy}>
+                                  {file.uploadedBy}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-slate-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="align-middle">
+                            <div className="flex items-center space-x-2">
+                              <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-sm text-slate-600">
+                                {formatDate(file.uploadedAt)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-middle">{getStatusBadge(file.status)}</TableCell>
+                          <TableCell className="align-middle">
+                            <Button variant="ghost" size="sm">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {filterFiles(getAllFiles()).length > itemsPerPage && (
+                    <div className="p-4 border-t">
+                      <SimplePagination
+                        currentPage={filesPage}
+                        totalPages={Math.ceil(filterFiles(getAllFiles()).length / itemsPerPage)}
+                        onPageChange={setFilesPage}
+                        totalItems={filterFiles(getAllFiles()).length}
+                      />
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               ) : (
                 <div className="p-8 text-center text-slate-500">
                   <svg className="h-12 w-12 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p>No documents uploaded yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Videos */}
-          <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="border-b border-slate-200">
-              <CardTitle className="flex items-center text-xl">
-                <svg className="h-5 w-5 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Videos ({projectDetails.videos.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {projectDetails.videos.length > 0 ? (
-                <div className="divide-y divide-slate-100">
-                  {projectDetails.videos.map((video: Video) => (
-                    <div key={video.id} className="p-4 hover:bg-slate-50/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          {getFileIcon(video.fileType)}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{video.fileName}</p>
-                            <p className="text-xs text-slate-500">Uploaded: {formatDate(video.uploadedAt)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {getStatusBadge(video.status)}
-                          <Button variant="ghost" size="sm">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-slate-500">
-                  <svg className="h-12 w-12 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  <p>No videos uploaded yet</p>
+                  <p>No files uploaded yet</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
+
+        {/* Members Section */}
+        {projectDetails.members.length > 0 && (
+          <Card className="mt-8 shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="border-b border-slate-200">
+              <CardTitle className="flex items-center text-xl">
+                <svg className="h-5 w-5 mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Team Members ({projectDetails.members.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {projectDetails.members.map((member: Member) => (
+                  <div key={member.id} className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
+                    member.role === 'CREATOR' 
+                      ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' 
+                      : member.role === 'LEADER'
+                      ? 'border-yellow-200 bg-yellow-50 hover:bg-yellow-100'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
+                        member.role === 'CREATOR'
+                          ? 'bg-purple-100 text-purple-700'
+                          : member.role === 'LEADER' 
+                          ? 'bg-yellow-100 text-yellow-700' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {member.role === 'CREATOR' ? (
+                          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                          </svg>
+                        ) : member.role === 'LEADER' ? (
+                          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{member.fullName}</p>
+                        <p className="text-sm text-slate-600 truncate" title={member.email}>{member.email}</p>
+                        <p className="text-xs text-slate-500">Joined: {formatDate(member.joinedAt)}</p>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
+                      member.role === 'CREATOR'
+                        ? 'bg-purple-100 text-purple-800 border-purple-200'
+                        : member.role === 'LEADER' 
+                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200' 
+                        : 'bg-blue-100 text-blue-800 border-blue-200'
+                    }`}>
+                      {member.role}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Folders Section */}
         {projectDetails.folders.length > 0 && (
@@ -304,11 +544,16 @@ export default function ProjectDetailsPage() {
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {projectDetails.folders.map((folder) => (
-                  <div key={folder.id} className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50">
-                    <svg className="h-8 w-8 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-                    </svg>
-                    <span className="font-medium text-slate-900">{folder.name}</span>
+                  <div key={folder.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50">
+                    <div className="flex items-center space-x-3">
+                      <svg className="h-8 w-8 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                      </svg>
+                      <div>
+                        <span className="font-medium text-slate-900">{folder.folderName}</span>
+                        <p className="text-xs text-slate-500">Created: {formatDate(folder.createdAt)}</p>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

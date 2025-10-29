@@ -37,6 +37,7 @@ export interface Document {
   fileName: string
   fileType: string
   uploadedAt: string
+  uploadedBy?: string
   status: string
 }
 
@@ -45,13 +46,23 @@ export interface Video {
   fileName: string
   fileType: string
   uploadedAt: string
+  uploadedBy?: string
   status: string
 }
 
 export interface Folder {
   id: string
-  name: string
-  // Add more folder properties as needed
+  folderName: string
+  createdAt: string
+}
+
+export interface Member {
+  id: string,
+  email: string
+  fullName: string
+  role: string
+  joinedAt: string
+  removedAt: string | null
 }
 
 export interface ProjectDetails {
@@ -59,6 +70,7 @@ export interface ProjectDetails {
   projectName: string
   description: string
   createdAt: string
+  members: Member[]
   folders: Folder[]
   documents: Document[]
   videos: Video[]
