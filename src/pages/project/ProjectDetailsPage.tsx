@@ -191,10 +191,10 @@ export default function ProjectDetailsPage() {
     let colorClasses = ""
     
     switch (statusUpper) {
-      case 'APPROVED':
+      case 'COMPLETED':
         colorClasses = "bg-green-100 text-green-800 border-green-200"
         break
-      case 'PENDING':
+      case 'IN_PROGRESS':
         colorClasses = "bg-yellow-100 text-yellow-800 border-yellow-200"
         break
       case 'REVIEW':

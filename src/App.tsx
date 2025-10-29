@@ -5,6 +5,7 @@ import LoginPage from "@/pages/login/LoginPage"
 import { authApi } from "@/services/api"
 import HomePage from "@/pages/home/HomePage"
 import ProjectDetailsPage from "@/pages/project/ProjectDetailsPage"
+import CreateProjectPage from "@/pages/project/CreateProjectPage"
 import type { User } from "@/types"
 
 function App() {
@@ -80,12 +81,36 @@ function App() {
           }
         />
 
+        {/* Create project route */}
+        <Route
+          path="/create-project"
+          element={
+            isAuthenticated ? (
+              <CreateProjectPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
         {/* Project details route */}
         <Route
           path="/project/:projectId"
           element={
             isAuthenticated ? (
               <ProjectDetailsPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        {/* Create project route */}
+        <Route
+          path="/create-project"
+          element={
+            isAuthenticated ? (
+              <CreateProjectPage />
             ) : (
               <Navigate to="/login" replace />
             )

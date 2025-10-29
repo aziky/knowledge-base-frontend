@@ -3,7 +3,7 @@
 export interface User {
   id: string
   email: string
-  name?: string
+  fullName?: string
   role?: string
 }
 
@@ -75,3 +75,22 @@ export interface ProjectDetails {
   documents: Document[]
   videos: Video[]
 }
+
+// Interface for user invitation data
+export interface InvitationUser {
+  userId: string
+  fullName?: string
+  email: string,
+  role: string
+}
+
+
+// Interface for project invitation response
+export interface ProjectInvitationResponse {
+  projectId: string
+  invitedUsers: InvitationUser[]
+}
+
+
+
+

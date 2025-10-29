@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ApiResponse, Project, ProjectListResponse, ProjectDetails } from '@/types';
+import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
 
 const API_BASE_URL = 'http://localhost:7070';
 
@@ -109,7 +109,6 @@ export interface CreateProjectRequest {
   name: string;
   description?: string;
 }
-
 // Authentication API functions (user-service)
 export const authApi = {
   // Login function
@@ -117,7 +116,7 @@ export const authApi = {
     try {
       const response = await userServiceClient.post<ApiResponse<LoginResponse>>('/auth/login', credentials);
       const apiResponse = response.data;
-      
+
       // Check if the API response indicates success
       if (apiResponse.code === 200 && apiResponse.data) {
         return apiResponse.data;
@@ -172,7 +171,7 @@ export const projectApi = {
     try {
       const response = await projectServiceClient.get<ApiResponse<ProjectListResponse>>('/project');
       const apiResponse = response.data;
-      
+
       // Check if the API response indicates success
       if (apiResponse.code === 200 && apiResponse.data) {
         return apiResponse.data;
@@ -201,7 +200,7 @@ export const projectApi = {
     try {
       const response = await projectServiceClient.get<ApiResponse<ProjectDetails>>(`/project/${projectId}`);
       const apiResponse = response.data;
-      
+
       // Check if the API response indicates success
       if (apiResponse.code === 200 && apiResponse.data) {
         return apiResponse.data;
@@ -228,8 +227,18 @@ export const projectApi = {
   // Create new project
   createProject: async (projectData: CreateProjectRequest): Promise<Project> => {
     try {
-      const response = await projectServiceClient.post('/project', projectData);
-      return response.data;
+      const response = await projectServiceClient.post<ApiResponse<Project>>('/project', projectData);
+      const apiResponse = response.data;
+
+      // Check if the API response indicates success
+      if (apiResponse.code === 200 && apiResponse.data) {
+        return apiResponse.data;
+      } else {
+        throw {
+          message: apiResponse.message || 'Failed to fetch project details',
+          status: apiResponse.code,
+        } as ApiError;
+      }
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw {
@@ -270,6 +279,61 @@ export const projectApi = {
         throw {
           message: error.response?.data?.message || 'Failed to delete project',
           status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Invite users to project
+  inviteUsersToProject: async (projectId: string, invitationUsers: InvitationUser[]): Promise<ProjectInvitationResponse> => {
+    try {
+      const response = await projectServiceClient.post(`/project/${projectId}/invite`, invitationUsers);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to invite users to project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+};
+
+// User API functions (user-service)
+export const userApi = {
+  // Search users by name or email
+  searchUsers: async (searchTerm: string): Promise<User[]> => {
+    try {
+      console.log('Searching users with term:', searchTerm);
+
+      const endpoint = searchTerm.trim()
+        ? `/user?name=${encodeURIComponent(searchTerm)}`
+        : `/user`;
+
+      const response = await userServiceClient.get<ApiResponse<User[]>>(endpoint);
+      const apiResponse = response.data;
+
+      if (apiResponse.code === 200 && apiResponse.data) {
+        return apiResponse.data;
+      } else {
+        throw {
+          message: apiResponse.message || 'Failed to search users',
+          status: apiResponse.code,
+        } as ApiError;
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const apiResponse = error.response?.data as ApiResponse<null>;
+        throw {
+          message: apiResponse?.message || error.response?.data?.message || 'Failed to search users',
+          status: error.response?.status || apiResponse?.code,
         } as ApiError;
       }
       throw {
