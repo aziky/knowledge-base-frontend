@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
+import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser, Document, Video } from '@/types';
 
 const API_BASE_URL = 'http://localhost:7070';
 
@@ -304,6 +304,32 @@ export const projectApi = {
       } as ApiError;
     }
   },
+
+    // Add file to project
+    addFilesToProject: async (projectId: string, files: File[]): Promise<(Document | Video)[]> => {
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append('files', file);
+      });
+      try {
+        const response = await projectServiceClient.post(`/project/${projectId}/upload`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        return response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          throw {
+            message: error.response?.data?.message || 'Failed to add files to project',
+            status: error.response?.status,
+          } as ApiError;
+        }
+        throw {
+          message: 'Network error occurred',
+        } as ApiError;
+      }
+    },
 };
 
 // User API functions (user-service)
