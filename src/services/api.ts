@@ -166,6 +166,27 @@ export const authApi = {
 
 // Project API functions (project-service)
 export const projectApi = {
+  // Delete files from project
+  deleteFilesFromProject: async (
+    projectId: string,
+    files: { id: string; fileType: string }[]
+  ) => {
+    try {
+      console.log('Deleting files:', files);
+      const response = await projectServiceClient.delete(`/project/${projectId}/files`, {
+        data: files,
+      });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || "Failed to delete files",
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: "Network error occurred" } as ApiError;
+    }
+  },
   // Get all projects
   getProjects: async (): Promise<ProjectListResponse> => {
     try {

@@ -98,7 +98,24 @@ export default function ProjectDetailsPage() {
   const handleAlertConfirm = () => {
     setAlertOpen(false)
     if (alertType === "warning" && pendingFiles.length > 0) {
-      uploadFiles(pendingFiles)
+      // Remove duplicates before uploading
+      const duplicatesToDelete = getAllFiles()
+        .filter((f) => duplicateFiles.includes(f.fileName))
+        .map((f) => ({ id: f.id, fileType: f.type }));
+      if (duplicatesToDelete.length > 0) {
+        setUploading(true);
+        projectApi.deleteFilesFromProject(projectId!, duplicatesToDelete)
+          .then(() => uploadFiles(pendingFiles))
+          .catch((err) => {
+            setAlertType("error");
+            setAlertTitle("Delete Error");
+            setAlertMessage(err.message || "Failed to delete files");
+            setAlertOpen(true);
+            setUploading(false);
+          });
+      } else {
+        uploadFiles(pendingFiles);
+      }
     }
   }
 
