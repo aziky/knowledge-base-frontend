@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser, Document, Video } from '@/types';
+import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
 
 const API_BASE_URL = 'http://localhost:7070';
 
@@ -305,31 +305,49 @@ export const projectApi = {
     }
   },
 
-    // Add file to project
-    addFilesToProject: async (projectId: string, files: File[]): Promise<(Document | Video)[]> => {
-      const formData = new FormData();
-      files.forEach((file) => {
-        formData.append('files', file);
-      });
-      try {
-        const response = await projectServiceClient.post(`/project/${projectId}/upload`, formData, {
+  // Add file to project
+  addFilesToProject: async (
+    projectId: string,
+    files: File[],
+    onProgress?: (progress: number) => void
+  ) => {
+    try {
+      let totalUploaded = 0;
+      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+      const uploadPromises = files.map((file) => {
+        const formData = new FormData();
+        formData.append("files", file);
+        return projectServiceClient.post(`/project/${projectId}/upload`, formData, {
+          timeout: 120000,
           headers: {
-            'Content-Type': 'multipart/form-data',
+            "Content-Type": undefined,
+          },
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.loaded && progressEvent.total) {
+              // Calculate cumulative progress for all files
+              totalUploaded += progressEvent.loaded;
+              if (onProgress) {
+                const percent = Math.min(100, Math.round((totalUploaded / totalSize) * 100));
+                onProgress(percent);
+              }
+            }
           },
         });
-        return response.data;
-      } catch (error) {
-        if (axios.isAxiosError(error)) {
-          throw {
-            message: error.response?.data?.message || 'Failed to add files to project',
-            status: error.response?.status,
-          } as ApiError;
-        }
+      });
+      const responses = await Promise.all(uploadPromises);
+      if (onProgress) onProgress(100); // Ensure progress bar completes on response
+      return responses.flatMap((r) => r.data);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
         throw {
-          message: 'Network error occurred',
+          message: error.response?.data?.message || "Failed to add files to project",
+          status: error.response?.status,
         } as ApiError;
       }
-    },
+      throw { message: "Network error occurred" } as ApiError;
+    }
+  },
+
 };
 
 // User API functions (user-service)

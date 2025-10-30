@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
   DialogContent,
@@ -26,8 +27,10 @@ export default function ProjectDetailsPage() {
   const [alertMessage, setAlertMessage] = useState("")
   const [alertTitle, setAlertTitle] = useState("")
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [duplicateFiles, setDuplicateFiles] = useState<string[]>([])
   // File upload states
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handler to trigger file input
@@ -42,10 +45,11 @@ export default function ProjectDetailsPage() {
     const existingNames = new Set(getAllFiles().map((f) => f.fileName.toLowerCase()))
     const duplicates = files.filter((f) => existingNames.has(f.name.toLowerCase()))
     if (duplicates.length > 0) {
-      const names = duplicates.map((f) => f.name).join(", ")
+      const duplicateNames = duplicates.map((f) => f.name)
+      setDuplicateFiles(duplicateNames)
       setAlertType("warning")
       setAlertTitle("Duplicate File Warning")
-      setAlertMessage(`File(s) with the same name already exist: ${names}. Do you want to replace them?`)
+      setAlertMessage("The following files already exist:")
       setAlertOpen(true)
       setPendingFiles(files)
       return
@@ -56,8 +60,20 @@ export default function ProjectDetailsPage() {
   // Upload files helper
   const uploadFiles = async (files: File[]) => {
     setUploading(true)
+    setUploadProgress(0)
     try {
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) return prev
+          return prev + Math.random() * 30
+        })
+      }, 300)
+
       await projectApi.addFilesToProject(projectId!, files)
+
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+
       await fetchProjectDetails(projectId!)
       setAlertType("success")
       setAlertTitle("Upload Successful")
@@ -71,8 +87,10 @@ export default function ProjectDetailsPage() {
       setAlertOpen(true)
     } finally {
       setUploading(false)
+      setUploadProgress(0)
       if (fileInputRef.current) fileInputRef.current.value = ""
       setPendingFiles([])
+      setDuplicateFiles([])
     }
   }
 
@@ -88,6 +106,7 @@ export default function ProjectDetailsPage() {
   const handleAlertClose = () => {
     setAlertOpen(false)
     setPendingFiles([])
+    setDuplicateFiles([])
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
@@ -309,9 +328,40 @@ export default function ProjectDetailsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <span className="ml-2 text-muted-foreground">Loading project details...</span>
+        <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Button variant="outline" onClick={() => navigate(-1)} className="border-slate-300 hover:bg-slate-50">
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    />
+                  </svg>
+                  Back to Projects
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Card className="mb-8 shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-white to-slate-50">
+              <CardTitle className="text-3xl font-bold text-slate-900">Loading...</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Blurred overlay with loading spinner */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/20">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-400 border-t-transparent"></div>
+            <span className="text-white font-medium">Loading project details...</span>
+          </div>
         </div>
       </div>
     )
@@ -369,7 +419,7 @@ export default function ProjectDetailsPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2V8l-6-6z"
                   />
                 </svg>
                 Edit Project
@@ -663,7 +713,7 @@ export default function ProjectDetailsPage() {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth={2}
-                              d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138z"
+                              d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138z"
                             />
                           </svg>
                         ) : (
@@ -761,22 +811,58 @@ export default function ProjectDetailsPage() {
             >
               {alertTitle}
             </DialogTitle>
-            <DialogDescription>{alertMessage}</DialogDescription>
+            {duplicateFiles.length > 0 ? (
+              <div className="space-y-2 mt-2">
+                <p className="text-sm text-slate-600">{alertMessage}</p>
+                <ul className="space-y-1 ml-4">
+                  {duplicateFiles.map((fileName, index) => (
+                    <li key={index} className="text-sm text-slate-700">
+                      • {fileName} → will replace: {fileName}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <DialogDescription>{alertMessage}</DialogDescription>
+            )}
           </DialogHeader>
+          {uploading && (
+            <div className="space-y-3 px-6 py-4 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">Uploading files...</span>
+                <span className="text-sm font-semibold text-blue-600">{Math.round(uploadProgress)}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-3" />
+            </div>
+          )}
           <DialogFooter className="flex gap-2 justify-end">
             {alertType === "warning" ? (
               <>
-                <Button variant="outline" onClick={handleAlertClose}>
+                <Button variant="outline" onClick={handleAlertClose} disabled={uploading}>
                   Cancel
                 </Button>
-                <Button onClick={handleAlertConfirm}>Replace</Button>
+                <Button onClick={handleAlertConfirm} disabled={uploading}>
+                  {uploading ? "Uploading..." : "Replace"}
+                </Button>
               </>
             ) : (
-              <Button onClick={handleAlertClose}>Close</Button>
+              <Button onClick={handleAlertClose} disabled={uploading}>
+                Close
+              </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Blurred overlay when uploading files */}
+      {uploading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/20">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-400 border-t-transparent"></div>
+            <span className="text-white font-medium">Uploading files...</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
