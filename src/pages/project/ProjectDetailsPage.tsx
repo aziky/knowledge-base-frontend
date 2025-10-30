@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,12 +9,39 @@ import { projectApi, type ApiError } from "@/services/api"
 import type { ProjectDetails, Member } from "@/types"
 
 export default function ProjectDetailsPage() {
+  // File upload states
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Handler to trigger file input
+  const handleAddFilesClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  // Handler for file input change
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!projectId || !e.target.files || e.target.files.length === 0) return
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const files = Array.from(e.target.files)
+      await projectApi.addFilesToProject(projectId, files)
+      await fetchProjectDetails(projectId) // Refresh file list
+    } catch (err) {
+      const apiError = err as ApiError
+      setUploadError(apiError.message || 'Failed to upload files')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = '' // Reset input
+    }
+  }
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Pagination and search states
   const [filesPage, setFilesPage] = useState(1)
   const [filesSearch, setFilesSearch] = useState("")
@@ -41,7 +69,7 @@ export default function ProjectDetailsPage() {
     try {
       setLoading(true)
       setError(null)
-      const details = await projectApi.getProjectDetails(id)      
+      const details = await projectApi.getProjectDetails(id)
       setProjectDetails(details)
     } catch (err) {
       const apiError = err as ApiError
@@ -58,24 +86,24 @@ export default function ProjectDetailsPage() {
   // Filter and pagination helpers
   const getAllFiles = (): UnifiedFile[] => {
     if (!projectDetails) return []
-    
+
     const documents: UnifiedFile[] = projectDetails.documents.map(doc => ({
       ...doc,
       type: "document" as const
     }))
-    
+
     const videos: UnifiedFile[] = projectDetails.videos.map(video => ({
       ...video,
       type: "video" as const
     }))
-    
-    return [...documents, ...videos].sort((a, b) => 
+
+    return [...documents, ...videos].sort((a, b) =>
       new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
     )
   }
 
   const filterFiles = (files: UnifiedFile[]) => {
-    let filtered = files.filter(file => 
+    let filtered = files.filter(file =>
       file.fileName.toLowerCase().includes(filesSearch.toLowerCase()) ||
       file.uploadedBy?.toLowerCase().includes(filesSearch.toLowerCase())
     )
@@ -98,7 +126,7 @@ export default function ProjectDetailsPage() {
       return (
         <div className="flex items-center justify-center w-8 h-8 rounded bg-red-100">
           <svg className="h-4 w-4 text-red-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
           </svg>
         </div>
       )
@@ -106,7 +134,7 @@ export default function ProjectDetailsPage() {
       return (
         <div className="flex items-center justify-center w-8 h-8 rounded bg-blue-100">
           <svg className="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
           </svg>
         </div>
       )
@@ -114,7 +142,7 @@ export default function ProjectDetailsPage() {
       return (
         <div className="flex items-center justify-center w-8 h-8 rounded bg-purple-100">
           <svg className="h-4 w-4 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z"/>
+            <path d="M8 5v14l11-7z" />
           </svg>
         </div>
       )
@@ -130,18 +158,18 @@ export default function ProjectDetailsPage() {
     return (
       <div className="flex items-center justify-center w-8 h-8 rounded bg-gray-100">
         <svg className="h-4 w-4 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
         </svg>
       </div>
     )
   }
 
   // Simple pagination component
-  const SimplePagination = ({ 
-    currentPage, 
-    totalPages, 
-    onPageChange, 
-    totalItems 
+  const SimplePagination = ({
+    currentPage,
+    totalPages,
+    onPageChange,
+    totalItems
   }: {
     currentPage: number
     totalPages: number
@@ -189,7 +217,7 @@ export default function ProjectDetailsPage() {
   const getStatusBadge = (status: string) => {
     const statusUpper = status.toUpperCase()
     let colorClasses = ""
-    
+
     switch (statusUpper) {
       case 'COMPLETED':
         colorClasses = "bg-green-100 text-green-800 border-green-200"
@@ -263,8 +291,8 @@ export default function ProjectDetailsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => navigate(-1)}
                 className="border-slate-300 hover:bg-slate-50"
               >
@@ -275,12 +303,7 @@ export default function ProjectDetailsPage() {
               </Button>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline">
-                <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Files
-              </Button>
+
               <Button>
                 <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -364,12 +387,24 @@ export default function ProjectDetailsPage() {
                     onChange={(e) => setFilesSearch(e.target.value)}
                     className="w-64"
                   />
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" onClick={handleAddFilesClick} disabled={uploading}>
                     <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    Add File
+                    {uploading ? 'Uploading...' : 'Add Files'}
                   </Button>
+                  {/* Hidden file input for upload */}
+                  <input
+                    type="file"
+                    multiple
+                    style={{ display: 'none' }}
+                    ref={fileInputRef}
+                    onChange={handleFilesSelected}
+                    accept=".pdf,.doc,.docx,.mp4,.png,.jpg,.jpeg,.txt,.xlsx,.ppt,.pptx,.csv,.zip,.rar,.7z,.tar,.gz,.json,.xml,.html,.js,.ts,.md,.rtf,.bmp,.gif,.svg,.webp,.avi,.mov,.wmv,.flv,.mkv"
+                  />
+                  {uploadError && (
+                    <div className="text-red-600 text-sm mt-2">{uploadError}</div>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -398,11 +433,10 @@ export default function ProjectDetailsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="align-middle">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-                              file.type === 'document' 
-                                ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${file.type === 'document'
+                                ? 'bg-blue-100 text-blue-800 border-blue-200'
                                 : 'bg-purple-100 text-purple-800 border-purple-200'
-                            }`}>
+                              }`}>
                               {file.type === 'document' ? 'Document' : 'Video'}
                             </span>
                           </TableCell>
@@ -479,21 +513,19 @@ export default function ProjectDetailsPage() {
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {projectDetails.members.map((member: Member) => (
-                  <div key={member.id} className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
-                    member.role === 'CREATOR' 
-                      ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' 
+                  <div key={member.id} className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${member.role === 'CREATOR'
+                      ? 'border-purple-200 bg-purple-50 hover:bg-purple-100'
                       : member.role === 'LEADER'
-                      ? 'border-yellow-200 bg-yellow-50 hover:bg-yellow-100'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}>
+                        ? 'border-yellow-200 bg-yellow-50 hover:bg-yellow-100'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}>
                     <div className="flex items-center space-x-3">
-                      <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
-                        member.role === 'CREATOR'
+                      <div className={`h-12 w-12 rounded-full flex items-center justify-center ${member.role === 'CREATOR'
                           ? 'bg-purple-100 text-purple-700'
-                          : member.role === 'LEADER' 
-                          ? 'bg-yellow-100 text-yellow-700' 
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
+                          : member.role === 'LEADER'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
                         {member.role === 'CREATOR' ? (
                           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
@@ -514,13 +546,12 @@ export default function ProjectDetailsPage() {
                         <p className="text-xs text-slate-500">Joined: {formatDate(member.joinedAt)}</p>
                       </div>
                     </div>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
-                      member.role === 'CREATOR'
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${member.role === 'CREATOR'
                         ? 'bg-purple-100 text-purple-800 border-purple-200'
-                        : member.role === 'LEADER' 
-                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200' 
-                        : 'bg-blue-100 text-blue-800 border-blue-200'
-                    }`}>
+                        : member.role === 'LEADER'
+                          ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                          : 'bg-blue-100 text-blue-800 border-blue-200'
+                      }`}>
                       {member.role}
                     </span>
                   </div>
@@ -547,7 +578,7 @@ export default function ProjectDetailsPage() {
                   <div key={folder.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50">
                     <div className="flex items-center space-x-3">
                       <svg className="h-8 w-8 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                       </svg>
                       <div>
                         <span className="font-medium text-slate-900">{folder.folderName}</span>
