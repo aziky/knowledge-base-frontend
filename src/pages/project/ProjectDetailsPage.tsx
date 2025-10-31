@@ -1,5 +1,3 @@
-"use client"
-
 import type React from "react"
 
 import { useState, useEffect } from "react"
@@ -18,6 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { ChatPanel } from "@/components/chat-panel"
 import { projectApi, type ApiError } from "@/services/api"
 import type { ProjectDetails, Member } from "@/types"
 
@@ -28,6 +27,7 @@ export default function ProjectDetailsPage() {
   const [alertTitle, setAlertTitle] = useState("")
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [duplicateFiles, setDuplicateFiles] = useState<string[]>([])
+  const [chatOpen, setChatOpen] = useState(false)
   // File upload states
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -98,24 +98,7 @@ export default function ProjectDetailsPage() {
   const handleAlertConfirm = () => {
     setAlertOpen(false)
     if (alertType === "warning" && pendingFiles.length > 0) {
-      // Remove duplicates before uploading
-      const duplicatesToDelete = getAllFiles()
-        .filter((f) => duplicateFiles.includes(f.fileName))
-        .map((f) => ({ id: f.id, fileType: f.type }));
-      if (duplicatesToDelete.length > 0) {
-        setUploading(true);
-        projectApi.deleteFilesFromProject(projectId!, duplicatesToDelete)
-          .then(() => uploadFiles(pendingFiles))
-          .catch((err) => {
-            setAlertType("error");
-            setAlertTitle("Delete Error");
-            setAlertMessage(err.message || "Failed to delete files");
-            setAlertOpen(true);
-            setUploading(false);
-          });
-      } else {
-        uploadFiles(pendingFiles);
-      }
+      uploadFiles(pendingFiles)
     }
   }
 
@@ -430,6 +413,17 @@ export default function ProjectDetailsPage() {
               </Button>
             </div>
             <div className="flex items-center space-x-2">
+              <Button onClick={() => setChatOpen(true)}>
+                <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
+                Chat
+              </Button>
               <Button>
                 <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -460,7 +454,7 @@ export default function ProjectDetailsPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                   />
                 </svg>
                 <span>Created: {formatDate(projectDetails.createdAt)}</span>
@@ -575,11 +569,10 @@ export default function ProjectDetailsPage() {
                           </TableCell>
                           <TableCell className="align-middle">
                             <span
-                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-                                file.type === "document"
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${file.type === "document"
                                   ? "bg-blue-100 text-blue-800 border-blue-200"
                                   : "bg-purple-100 text-purple-800 border-purple-200"
-                              }`}
+                                }`}
                             >
                               {file.type === "document" ? "Document" : "Video"}
                             </span>
@@ -697,23 +690,21 @@ export default function ProjectDetailsPage() {
                 {projectDetails.members.map((member: Member) => (
                   <div
                     key={member.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
-                      member.role === "CREATOR"
+                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${member.role === "CREATOR"
                         ? "border-purple-200 bg-purple-50 hover:bg-purple-100"
                         : member.role === "LEADER"
                           ? "border-yellow-200 bg-yellow-50 hover:bg-yellow-100"
                           : "border-slate-200 bg-white hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center space-x-3">
                       <div
-                        className={`h-12 w-12 rounded-full flex items-center justify-center ${
-                          member.role === "CREATOR"
+                        className={`h-12 w-12 rounded-full flex items-center justify-center ${member.role === "CREATOR"
                             ? "bg-purple-100 text-purple-700"
                             : member.role === "LEADER"
                               ? "bg-yellow-100 text-yellow-700"
                               : "bg-blue-100 text-blue-700"
-                        }`}
+                          }`}
                       >
                         {member.role === "CREATOR" ? (
                           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -753,13 +744,12 @@ export default function ProjectDetailsPage() {
                       </div>
                     </div>
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
-                        member.role === "CREATOR"
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${member.role === "CREATOR"
                           ? "bg-purple-100 text-purple-800 border-purple-200"
                           : member.role === "LEADER"
                             ? "bg-yellow-100 text-yellow-800 border-yellow-200"
                             : "bg-blue-100 text-blue-800 border-blue-200"
-                      }`}
+                        }`}
                     >
                       {member.role}
                     </span>
@@ -812,19 +802,17 @@ export default function ProjectDetailsPage() {
 
       <Dialog open={alertOpen} onOpenChange={setAlertOpen}>
         <DialogContent
-          className={`${
-            alertType === "error"
+          className={`${alertType === "error"
               ? "border-red-200"
               : alertType === "warning"
                 ? "border-yellow-200"
                 : "border-green-200"
-          }`}
+            }`}
         >
           <DialogHeader>
             <DialogTitle
-              className={`${
-                alertType === "error" ? "text-red-600" : alertType === "warning" ? "text-yellow-600" : "text-green-600"
-              }`}
+              className={`${alertType === "error" ? "text-red-600" : alertType === "warning" ? "text-yellow-600" : "text-green-600"
+                }`}
             >
               {alertTitle}
             </DialogTitle>
@@ -880,6 +868,23 @@ export default function ProjectDetailsPage() {
           </div>
         </div>
       )}
+
+      {/* Chat Panel */}
+  {chatOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div className="relative w-full max-w-5xl mx-auto">
+        <ChatPanel selectedFiles={projectDetails ? getAllFiles().map(f => ({ id: f.id, name: f.fileName, icon: '' })) : []} />
+        <button
+          className="absolute top-4 right-4 bg-white/80 rounded-full p-2 shadow hover:bg-white"
+          onClick={() => setChatOpen(false)}
+        >
+          <svg className="h-5 w-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )}
     </div>
   )
 }
