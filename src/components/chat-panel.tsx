@@ -1,11 +1,10 @@
-"use client"
-
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Search, ArrowUp, X } from "lucide-react"
+import { chatApi } from "@/services/api"
 
 interface FileItem {
   id: string
@@ -20,10 +19,11 @@ interface Message {
 }
 
 interface ChatPanelProps {
-  selectedFiles: FileItem[]
+  projectId: string;
+  selectedFiles: FileItem[];
 }
 
-export function ChatPanel({ selectedFiles }: ChatPanelProps) {
+export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
   const [messages, setMessages] = useState<Message[]>([])
@@ -58,7 +58,23 @@ export function ChatPanel({ selectedFiles }: ChatPanelProps) {
 
   const selectedFileNames = selectedFiles.filter((f) => selectedFileIds.includes(f.id)).map((f) => f.name)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Function to format markdown-like text for display
+  const formatAnswerText = (text: string): string => {
+    if (!text) return text;
+    
+    return text
+      // Convert **bold** to HTML bold
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // Convert bullet points (* text) to proper list items
+      .replace(/^\*\s+(.*)$/gm, '• $1')
+      // Convert newlines to proper line breaks
+      .replace(/\n/g, '<br>')
+      // Clean up extra spaces
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || selectedFileIds.length === 0) return
 
@@ -72,49 +88,73 @@ export function ChatPanel({ selectedFiles }: ChatPanelProps) {
     setInput("")
     setIsLoading(true)
 
-    setTimeout(() => {
-      const selectedNames = selectedFileNames.join(", ")
+    // Prepare API payload
+    const payload = {
+      project_id: projectId,
+      document_ids: selectedFileIds,
+      question: input,
+    }
 
+    try {
+      const data = await chatApi.ask(payload);
+      // Assume response contains { answer: string }
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `I've reviewed the selected files: ${selectedNames}. This is a demo response showing how the chat would work with your files.`,
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
-      setIsLoading(false)
-    }, 800)
+        content: formatAnswerText(data.answer || "No answer returned."),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error contacting chat service:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Error contacting chat service.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
-  <div className="h-screen flex flex-col bg-background max-w-4xl mx-auto">
+    <div className="h-screen flex flex-col bg-background max-w-4xl mx-auto">
 
       {/* Chat Messages */}
-      {/* Chat Messages */}
-      <ScrollArea className="flex-1 p-6">
-        <div className="max-w-2xl mx-auto space-y-4">
-          {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-center">
-              <p className="text-muted-foreground text-sm">Select files and ask your questions</p>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-lg rounded-lg px-4 py-3 text-sm ${
-                    message.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-foreground border border-border"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="p-6">
+            <div className="max-w-2xl mx-auto space-y-4 min-h-full">
+              {messages.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-center min-h-[400px]">
+                  <p className="text-muted-foreground text-sm">Select files and ask your questions</p>
                 </div>
-              </div>
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+              ) : (
+                <>
+                  {messages.map((message) => (
+                    <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-lg rounded-lg px-4 py-3 text-sm ${message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-foreground border border-border"
+                          }`}
+                      >
+                        <div 
+                          className="whitespace-pre-wrap break-words"
+                          dangerouslySetInnerHTML={{ __html: message.content }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
+            </div>
+          </div>
+        </ScrollArea>
+      </div>
 
       <div className="border-t border-border p-6 bg-card">
         <div className="max-w-2xl mx-auto space-y-4">
@@ -214,11 +254,10 @@ export function ChatPanel({ selectedFiles }: ChatPanelProps) {
                       <button
                         key={file.id}
                         onClick={() => toggleFileSelection(file.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
-                          selectedFileIds.includes(file.id)
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${selectedFileIds.includes(file.id)
                             ? "bg-muted text-foreground"
                             : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                        }`}
+                          }`}
                       >
                         <span className="text-lg flex-shrink-0">{file.icon}</span>
                         <span className="text-sm font-medium truncate">{file.name}</span>

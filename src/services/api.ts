@@ -1,3 +1,33 @@
+// Chat API functions (chat-service)
+const chatServiceClient = axios.create({
+  baseURL: 'http://localhost:7075/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 10000,
+});
+
+export const chatApi = {
+  ask: async (payload: { project_id?: string; document_ids: string[]; question: string }) => {
+    try {
+      // If document_ids is not empty, remove project_id from payload
+      const sendPayload = { ...payload };
+      if (sendPayload.document_ids && sendPayload.document_ids.length > 0) {
+        delete sendPayload.project_id;
+      }
+      const response = await chatServiceClient.post('/chat', sendPayload);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to get response from chat service',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: 'Network error occurred' } as ApiError;
+    }
+  },
+};
 import axios from 'axios';
 import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
 
@@ -443,6 +473,7 @@ const addAuthInterceptors = (client: ReturnType<typeof axios.create>) => {
 addAuthInterceptors(userServiceClient);
 addAuthInterceptors(projectServiceClient);
 addAuthInterceptors(notificationServiceClient);
+addAuthInterceptors(chatServiceClient);
 
 // Export individual clients if needed
 export { userServiceClient, projectServiceClient, notificationServiceClient };
