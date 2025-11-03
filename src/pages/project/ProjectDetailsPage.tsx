@@ -873,7 +873,10 @@ export default function ProjectDetailsPage() {
   {chatOpen && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="relative w-full max-w-5xl mx-auto">
-        <ChatPanel selectedFiles={projectDetails ? getAllFiles().map(f => ({ id: f.id, name: f.fileName, icon: '' })) : []} />
+        <ChatPanel
+          projectId={projectDetails?.projectId || ""}
+          selectedFiles={projectDetails ? getAllFiles().map(f => ({ id: f.id, name: f.fileName, icon: '' })) : []}
+        />
         <button
           className="absolute top-4 right-4 bg-white/80 rounded-full p-2 shadow hover:bg-white"
           onClick={() => setChatOpen(false)}
