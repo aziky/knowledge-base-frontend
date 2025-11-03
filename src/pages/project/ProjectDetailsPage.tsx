@@ -875,7 +875,12 @@ export default function ProjectDetailsPage() {
       <div className="relative w-full max-w-5xl mx-auto">
         <ChatPanel
           projectId={projectDetails?.projectId || ""}
-          selectedFiles={projectDetails ? getAllFiles().map(f => ({ id: f.id, name: f.fileName, icon: '' })) : []}
+          selectedFiles={projectDetails ? getAllFiles().map(f => ({ 
+            id: f.id, 
+            name: f.fileName, 
+            icon: '',
+            type: f.type
+          })) : []}
         />
         <button
           className="absolute top-4 right-4 bg-white/80 rounded-full p-2 shadow hover:bg-white"
