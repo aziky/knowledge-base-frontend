@@ -4,7 +4,7 @@ const chatServiceClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 180000, // 3 minutes timeout for chat API
 });
 
 export const chatApi = {
