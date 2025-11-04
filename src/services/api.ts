@@ -204,7 +204,7 @@ export const projectApi = {
     files: { id: string; fileType: string }[]
   ) => {
     try {
-      console.log('Deleting files:', files);
+      console.log('Deleting files:', JSON.stringify(files));
       const response = await projectServiceClient.delete(`/project/${projectId}/files`, {
         data: files,
       });

@@ -27,6 +27,7 @@ export default function ProjectDetailsPage() {
   const [alertTitle, setAlertTitle] = useState("")
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [duplicateFiles, setDuplicateFiles] = useState<string[]>([])
+  const [duplicateFileObjects, setDuplicateFileObjects] = useState<UnifiedFile[]>([])
   const [chatOpen, setChatOpen] = useState(false)
   // File upload states
   const [uploading, setUploading] = useState(false)
@@ -42,11 +43,16 @@ export default function ProjectDetailsPage() {
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!projectId || !e.target.files || e.target.files.length === 0) return
     const files = Array.from(e.target.files)
-    const existingNames = new Set(getAllFiles().map((f) => f.fileName.toLowerCase()))
+    const allFiles = getAllFiles()
+    const existingNames = new Set(allFiles.map((f) => f.fileName.toLowerCase()))
     const duplicates = files.filter((f) => existingNames.has(f.name.toLowerCase()))
     if (duplicates.length > 0) {
       const duplicateNames = duplicates.map((f) => f.name)
+      const duplicateObjects = allFiles.filter((existingFile) => 
+        duplicateNames.some(name => name.toLowerCase() === existingFile.fileName.toLowerCase())
+      )
       setDuplicateFiles(duplicateNames)
+      setDuplicateFileObjects(duplicateObjects)
       setAlertType("warning")
       setAlertTitle("Duplicate File Warning")
       setAlertMessage("The following files already exist:")
@@ -91,13 +97,45 @@ export default function ProjectDetailsPage() {
       if (fileInputRef.current) fileInputRef.current.value = ""
       setPendingFiles([])
       setDuplicateFiles([])
+      setDuplicateFileObjects([])
     }
   }
 
   // Handler for confirming duplicate file replacement
-  const handleAlertConfirm = () => {
+  const handleAlertConfirm = async () => {
     setAlertOpen(false)
     if (alertType === "warning" && pendingFiles.length > 0) {
+      // Delete existing duplicate files first
+      if (duplicateFileObjects.length > 0) {
+        try {
+          setUploading(true)
+          setUploadProgress(10)
+          
+          const filesToDelete = duplicateFileObjects.map(file => ({
+            id: file.id,
+            fileType: file.type
+          }))
+          
+          await projectApi.deleteFilesFromProject(projectId!, filesToDelete)
+          setUploadProgress(30)
+          
+          // Refresh project details to get updated file list
+          await fetchProjectDetails(projectId!)
+          setUploadProgress(50)
+          
+        } catch (err) {
+          const apiError = err as ApiError
+          setAlertType("error")
+          setAlertTitle("Delete Error")
+          setAlertMessage(apiError.message || "Failed to delete existing files")
+          setAlertOpen(true)
+          setUploading(false)
+          setUploadProgress(0)
+          return
+        }
+      }
+      
+      // Now upload the new files
       uploadFiles(pendingFiles)
     }
   }
@@ -107,6 +145,7 @@ export default function ProjectDetailsPage() {
     setAlertOpen(false)
     setPendingFiles([])
     setDuplicateFiles([])
+    setDuplicateFileObjects([])
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
