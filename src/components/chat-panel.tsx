@@ -31,6 +31,7 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isContextOpen, setIsContextOpen] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const contextPopoverRef = useRef<HTMLDivElement>(null)
 
@@ -99,6 +100,7 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
       document_ids: documentIds,
       video_ids: videoIds,
       question: input,
+      conversation_id: conversationId,
     }
 
     try {
@@ -109,6 +111,7 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
         role: "assistant",
         content: formatAnswerText(data.answer || "No answer returned."),
       };
+      setConversationId(data.conversation_id || null);
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error("Error contacting chat service:", error);
