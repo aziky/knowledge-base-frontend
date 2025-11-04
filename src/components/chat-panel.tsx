@@ -10,6 +10,7 @@ interface FileItem {
   id: string
   name: string
   icon: string
+  type?: "document" | "video" // Add type field to distinguish file types
 }
 
 interface Message {
@@ -76,7 +77,7 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || selectedFileIds.length === 0) return
+    if (!input.trim()) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -89,9 +90,14 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
     setIsLoading(true)
 
     // Prepare API payload
+    const selectedFilesData = selectedFiles.filter(f => selectedFileIds.includes(f.id))
+    const documentIds = selectedFilesData.filter(f => f.type === "document").map(f => f.id)
+    const videoIds = selectedFilesData.filter(f => f.type === "video").map(f => f.id)
+
     const payload = {
       project_id: projectId,
-      document_ids: selectedFileIds,
+      document_ids: documentIds,
+      video_ids: videoIds,
       question: input,
     }
 
@@ -129,7 +135,9 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
             <div className="max-w-2xl mx-auto space-y-4 min-h-full">
               {messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-center min-h-[400px]">
-                  <p className="text-muted-foreground text-sm">Select files and ask your questions</p>
+                  <p className="text-muted-foreground text-sm">
+                    Ask questions about your project or select files for specific context
+                  </p>
                 </div>
               ) : (
                 <>
@@ -193,7 +201,7 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask, search, or make anything..."
-                disabled={isLoading || selectedFileIds.length === 0}
+                disabled={isLoading}
                 className="flex-1 bg-secondary border-secondary text-sm pr-32"
               />
 
@@ -209,7 +217,7 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
 
             <Button
               type="submit"
-              disabled={isLoading || selectedFileIds.length === 0 || !input.trim()}
+              disabled={isLoading || !input.trim()}
               size="icon"
               className="h-10 w-10 rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
             >

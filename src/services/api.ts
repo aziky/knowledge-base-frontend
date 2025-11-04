@@ -8,13 +8,15 @@ const chatServiceClient = axios.create({
 });
 
 export const chatApi = {
-  ask: async (payload: { project_id?: string; document_ids: string[]; question: string }) => {
+  ask: async (payload: { project_id?: string; document_ids: string[]; video_ids: string[]; question: string }) => {
     try {
-      // If document_ids is not empty, remove project_id from payload
+      // If document_ids or video_ids is not empty, remove project_id from payload
       const sendPayload = { ...payload };
-      if (sendPayload.document_ids && sendPayload.document_ids.length > 0) {
+      if ((sendPayload.document_ids && sendPayload.document_ids.length > 0) || 
+          (sendPayload.video_ids && sendPayload.video_ids.length > 0)) {
         delete sendPayload.project_id;
       }
+      console.log('Chat ask payload:', JSON.stringify(sendPayload));
       const response = await chatServiceClient.post('/chat', sendPayload);
       return response.data;
     } catch (error) {
@@ -202,7 +204,7 @@ export const projectApi = {
     files: { id: string; fileType: string }[]
   ) => {
     try {
-      console.log('Deleting files:', files);
+      console.log('Deleting files:', JSON.stringify(files));
       const response = await projectServiceClient.delete(`/project/${projectId}/files`, {
         data: files,
       });
