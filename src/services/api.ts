@@ -8,7 +8,7 @@ const chatServiceClient = axios.create({
 });
 
 export const chatApi = {
-  ask: async (payload: { project_id?: string; document_ids: string[]; video_ids: string[]; question: string }) => {
+  ask: async (payload: { project_id?: string; document_ids: string[]; video_ids: string[]; question: string; conversation_id?: string | null }) => {
     try {
       // If document_ids or video_ids is not empty, remove project_id from payload
       const sendPayload = { ...payload };
@@ -23,6 +23,36 @@ export const chatApi = {
       if (axios.isAxiosError(error)) {
         throw {
           message: error.response?.data?.message || 'Failed to get response from chat service',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: 'Network error occurred' } as ApiError;
+    }
+  },
+  
+  getConversations: async () => {
+    try {
+      const response = await chatServiceClient.get(`/chat`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to get conversations',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: 'Network error occurred' } as ApiError;
+    }
+  },
+  
+  getConversationMessages: async (conversationId: string) => {
+    try {
+      const response = await chatServiceClient.get(`/chat/${conversationId}`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to get conversation messages',
           status: error.response?.status,
         } as ApiError;
       }
