@@ -22,18 +22,32 @@ interface Message {
 interface ChatPanelProps {
   projectId: string;
   selectedFiles: FileItem[];
+  conversationId?: string | null;
+  initialMessages?: Message[];
+  onConversationStart?: (conversationId: string) => void;
+  onBackToConversations?: () => void;
 }
 
-export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
+interface Conversation {
+  conversation_id: string
+  title: string
+  status: "ACTIVE" | "ARCHIVED"
+  created_at: string
+}
+
+export function ChatPanel({ projectId, selectedFiles, conversationId: externalConversationId, initialMessages = [], onConversationStart, onBackToConversations }: ChatPanelProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isContextOpen, setIsContextOpen] = useState(false)
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(externalConversationId || null);
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const contextPopoverRef = useRef<HTMLDivElement>(null)
+  const hasLoadedConversations = useRef(false)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -51,6 +65,73 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
     }
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [isContextOpen])
+
+  // Load conversations when component mounts
+  useEffect(() => {
+    // Prevent duplicate calls in Strict Mode
+    if (hasLoadedConversations.current) return
+    hasLoadedConversations.current = true
+
+    const loadConversations = async () => {
+      setIsLoadingConversations(true)
+      try {
+        const response = await chatApi.getConversations()
+        console.log("getting all conversation: " + JSON.stringify(response));
+        
+        setConversations(response.conversations || [])
+      } catch (error) {
+        console.error("Error loading conversations:", error)
+      } finally {
+        setIsLoadingConversations(false)
+      }
+    }
+
+    loadConversations()
+  }, [])
+
+  const handleConversationClick = async (convId: string) => {
+    try {
+      setIsLoading(true)
+      const data = await chatApi.getConversationMessages(convId)
+      
+      interface ApiMessage {
+        id: string;
+        sender_type: "USER" | "BOT";
+        content: string;
+        created_at: string;
+        metadata?: Record<string, unknown>;
+      }
+      
+      // Handle the nested structure: data.messages contains the array
+      const messagesArray = data.messages || []
+      const loadedMessages: Message[] = messagesArray.map((msg: ApiMessage) => ({
+        id: msg.id,
+        role: msg.sender_type === 'USER' ? 'user' : 'assistant',
+        content: formatAnswerText(msg.content),
+      }))
+      
+      setMessages(loadedMessages)
+      setConversationId(convId)
+    } catch (error) {
+      console.error("Error loading conversation messages:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+    } else if (diffInHours < 168) {
+      return date.toLocaleDateString("en-US", { weekday: "short", hour: "2-digit", minute: "2-digit" })
+    } else {
+      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    }
+  }
 
   const filteredFiles = selectedFiles.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
@@ -111,7 +192,14 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
         role: "assistant",
         content: formatAnswerText(data.answer || "No answer returned."),
       };
-      setConversationId(data.conversation_id || null);
+      const newConversationId = data.conversation_id || null;
+      setConversationId(newConversationId);
+      
+      // Notify parent component if a new conversation was started
+      if (newConversationId && !conversationId && onConversationStart) {
+        onConversationStart(newConversationId);
+      }
+      
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error("Error contacting chat service:", error);
@@ -130,6 +218,29 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
 
   return (
     <div className="h-screen flex flex-col bg-background max-w-4xl mx-auto">
+      {/* Header with back button - only show when there are messages */}
+      {messages.length > 0 && (
+        <div className="border-b border-border p-4 bg-card">
+          <div className="max-w-2xl mx-auto flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setMessages([])
+                setConversationId(null)
+                // Notify parent component to handle back navigation
+                if (onBackToConversations) {
+                  onBackToConversations()
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <ArrowUp className="w-4 h-4 -rotate-90" />
+              <span>Back to Conversations</span>
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-hidden">
@@ -137,10 +248,48 @@ export function ChatPanel({ projectId, selectedFiles }: ChatPanelProps) {
           <div className="p-6">
             <div className="max-w-2xl mx-auto space-y-4 min-h-full">
               {messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-center min-h-[400px]">
-                  <p className="text-muted-foreground text-sm">
-                    Ask questions about your project or select files for specific context
-                  </p>
+                <div className="h-full flex flex-col items-center justify-center min-h-[400px]">
+                  {isLoadingConversations ? (
+                    <p className="text-muted-foreground text-sm">Loading conversations...</p>
+                  ) : conversations.length > 0 ? (
+                    <div className="w-full max-w-xl space-y-4">
+                      <div className="text-center mb-6">
+                        <h2 className="text-2xl font-semibold mb-2">Previous Conversations</h2>
+                        <p className="text-muted-foreground text-sm">
+                          Select a conversation to continue, or start asking questions below
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {conversations.map((conv) => (
+                          <button
+                            key={conv.conversation_id}
+                            onClick={() => handleConversationClick(conv.conversation_id)}
+                            className="w-full p-4 rounded-lg border border-border bg-card hover:bg-muted transition-colors text-left group"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-sm mb-1 truncate group-hover:text-primary transition-colors">
+                                  {conv.title}
+                                </h3>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDate(conv.created_at)}
+                                </p>
+                              </div>
+                              <div className="text-muted-foreground group-hover:text-foreground transition-colors">
+                                <ArrowUp className="w-4 h-4 rotate-90" />
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-muted-foreground text-sm">
+                        Ask questions about your project or select files for specific context
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
