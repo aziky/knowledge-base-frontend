@@ -149,6 +149,31 @@ export default function ProjectDetailsPage() {
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
+  // Handler for downloading files
+  const handleDownloadFile = async (file: UnifiedFile) => {
+    if (!projectId) return
+    
+    try {
+      setAlertType("success")
+      setAlertTitle("Downloading...")
+      setAlertMessage(`Downloading ${file.fileName}...`)
+      setAlertOpen(true)
+      
+      await projectApi.downloadFile(file.id, file.type, file.fileName)
+      
+      setAlertType("success")
+      setAlertTitle("Download Successful")
+      setAlertMessage(`${file.fileName} has been downloaded successfully!`)
+      setAlertOpen(true)
+    } catch (err) {
+      const apiError = err as ApiError
+      setAlertType("error")
+      setAlertTitle("Download Error")
+      setAlertMessage(apiError.message || "Failed to download file")
+      setAlertOpen(true)
+    }
+  }
+
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null)
@@ -660,7 +685,12 @@ export default function ProjectDetailsPage() {
                           </TableCell>
                           <TableCell className="align-middle">{getStatusBadge(file.status)}</TableCell>
                           <TableCell className="align-middle">
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleDownloadFile(file)}
+                              title={`Download ${file.fileName}`}
+                            >
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
                                   strokeLinecap="round"
