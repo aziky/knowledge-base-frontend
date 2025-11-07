@@ -431,6 +431,45 @@ export const projectApi = {
     }
   },
 
+  // Download file from project
+  downloadFile: async (
+    fileId: string,
+    fileType: 'document' | 'video',
+    fileName: string
+  ) => {
+    try {
+
+
+      const response = await projectServiceClient.get(`/project/download/${fileId}?type=${fileType}`, {
+        responseType: 'blob', // Important for file downloads
+        timeout: 180000, // 3 minutes for large files
+      });
+
+      const presignedUrl = response.data.presignedUrl;
+      const blob = new Blob([presignedUrl]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      return true;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || "Failed to download file",
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: "Network error occurred" } as ApiError;
+    }
+  },
+
 };
 
 // User API functions (user-service)
