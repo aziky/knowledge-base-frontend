@@ -1,3 +1,6 @@
+import axios from 'axios';
+import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
+
 // Chat API functions (chat-service)
 const chatServiceClient = axios.create({
   baseURL: 'http://localhost:7075/api',
@@ -12,8 +15,8 @@ export const chatApi = {
     try {
       // If document_ids or video_ids is not empty, remove project_id from payload
       const sendPayload = { ...payload };
-      if ((sendPayload.document_ids && sendPayload.document_ids.length > 0) || 
-          (sendPayload.video_ids && sendPayload.video_ids.length > 0)) {
+      if ((sendPayload.document_ids && sendPayload.document_ids.length > 0) ||
+        (sendPayload.video_ids && sendPayload.video_ids.length > 0)) {
         delete sendPayload.project_id;
       }
       console.log('Chat ask payload:', JSON.stringify(sendPayload));
@@ -29,7 +32,7 @@ export const chatApi = {
       throw { message: 'Network error occurred' } as ApiError;
     }
   },
-  
+
   getConversations: async () => {
     try {
       const response = await chatServiceClient.get(`/chat`);
@@ -44,7 +47,7 @@ export const chatApi = {
       throw { message: 'Network error occurred' } as ApiError;
     }
   },
-  
+
   getConversationMessages: async (conversationId: string) => {
     try {
       const response = await chatServiceClient.get(`/chat/${conversationId}`);
@@ -60,8 +63,6 @@ export const chatApi = {
     }
   },
 };
-import axios from 'axios';
-import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
 
 const API_BASE_URL = 'http://localhost:7070';
 
@@ -354,12 +355,9 @@ export const projectApi = {
   },
 
   // Delete project
-  deleteProject: async (projectId: string, reason?: string): Promise<void> => {
+  deleteProject: async (projectId: string): Promise<void> => {
     try {
-      const payload = reason ? { lockReason: reason } : undefined;
-      console.log("request payload for delete {}", JSON.stringify(payload));
-
-      await projectServiceClient.delete(`/project/${projectId}`, { data: payload });
+      await projectServiceClient.delete(`/project/${projectId}`);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw {
@@ -373,10 +371,11 @@ export const projectApi = {
     }
   },
 
-  // Reactivate project
-  reactivateProject: async (projectId: string): Promise<void> => {
+  // Activate project
+  activateProject: async (projectId: string): Promise<void> => {
     try {
-      await projectServiceClient.put(`/project/${projectId}/reactivate`);
+
+      await projectServiceClient.patch(`/project/${projectId}`);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw {
@@ -493,11 +492,11 @@ export const projectApi = {
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
-      
+
       // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       return true;
     } catch (error) {
       if (axios.isAxiosError(error)) {

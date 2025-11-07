@@ -31,14 +31,13 @@ export default function ProjectDetailsPage() {
   const [duplicateFileObjects, setDuplicateFileObjects] = useState<UnifiedFile[]>([])
   const [chatOpen, setChatOpen] = useState(false)
   const [editMode, setEditMode] = useState(false)
-  
+
   // Inline editing states
   const [editingProjectName, setEditingProjectName] = useState("")
   const [editingProjectDescription, setEditingProjectDescription] = useState("")
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
   const [selectedMembers, setSelectedMembers] = useState<string[]>([])
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("")
-  const [deleteReason, setDeleteReason] = useState("")
   // File upload states
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -58,7 +57,7 @@ export default function ProjectDetailsPage() {
     const duplicates = files.filter((f) => existingNames.has(f.name.toLowerCase()))
     if (duplicates.length > 0) {
       const duplicateNames = duplicates.map((f) => f.name)
-      const duplicateObjects = allFiles.filter((existingFile) => 
+      const duplicateObjects = allFiles.filter((existingFile) =>
         duplicateNames.some(name => name.toLowerCase() === existingFile.fileName.toLowerCase())
       )
       setDuplicateFiles(duplicateNames)
@@ -120,19 +119,19 @@ export default function ProjectDetailsPage() {
         try {
           setUploading(true)
           setUploadProgress(10)
-          
+
           const filesToDelete = duplicateFileObjects.map(file => ({
             id: file.id,
             fileType: file.type
           }))
-          
+
           await projectApi.deleteFilesFromProject(projectId!, filesToDelete)
           setUploadProgress(30)
-          
+
           // Refresh project details to get updated file list
           await fetchProjectDetails(projectId!)
           setUploadProgress(50)
-          
+
         } catch (err) {
           const apiError = err as ApiError
           setAlertType("error")
@@ -144,7 +143,7 @@ export default function ProjectDetailsPage() {
           return
         }
       }
-      
+
       // Now upload the new files
       uploadFiles(pendingFiles)
     }
@@ -162,15 +161,15 @@ export default function ProjectDetailsPage() {
   // Handler for downloading files
   const handleDownloadFile = async (file: UnifiedFile) => {
     if (!projectId) return
-    
+
     try {
       setAlertType("success")
       setAlertTitle("Downloading...")
       setAlertMessage(`Downloading ${file.fileName}...`)
       setAlertOpen(true)
-      
+
       await projectApi.downloadFile(file.id, file.type, file.fileName)
-      
+
       setAlertType("success")
       setAlertTitle("Download Successful")
       setAlertMessage(`${file.fileName} has been downloaded successfully!`)
@@ -214,7 +213,7 @@ export default function ProjectDetailsPage() {
     setUploading(true)
     try {
       // 1. Update project info if changed
-      const projectInfoChanged = 
+      const projectInfoChanged =
         editingProjectName.trim() !== projectDetails.projectName ||
         editingProjectDescription.trim() !== projectDetails.description
 
@@ -249,14 +248,14 @@ export default function ProjectDetailsPage() {
       setEditMode(false)
       setSelectedFiles([])
       setSelectedMembers([])
-      
+
       setAlertType("success")
       setAlertTitle("Success")
       const changes = []
       if (projectInfoChanged) changes.push("project info")
       if (selectedFiles.length > 0) changes.push(`${selectedFiles.length} file(s) deleted`)
       if (selectedMembers.length > 0) changes.push(`${selectedMembers.length} member(s) removed`)
-      
+
       setAlertMessage(changes.length > 0 ? `Updated: ${changes.join(", ")}` : "No changes to save")
       setAlertOpen(true)
     } catch (err) {
@@ -272,8 +271,8 @@ export default function ProjectDetailsPage() {
 
   // Handle file selection
   const handleFileSelect = (fileId: string, checked: boolean) => {
-    setSelectedFiles(prev => 
-      checked 
+    setSelectedFiles(prev =>
+      checked
         ? [...prev, fileId]
         : prev.filter(id => id !== fileId)
     )
@@ -290,8 +289,8 @@ export default function ProjectDetailsPage() {
 
   // Handle member selection
   const handleMemberSelect = (memberId: string, checked: boolean) => {
-    setSelectedMembers(prev => 
-      checked 
+    setSelectedMembers(prev =>
+      checked
         ? [...prev, memberId]
         : prev.filter(id => id !== memberId)
     )
@@ -310,8 +309,8 @@ export default function ProjectDetailsPage() {
 
     setUploading(true)
     try {
-      await projectApi.deleteProject(projectDetails.projectId, deleteReason.trim() || undefined)
-      
+      await projectApi.deleteProject(projectDetails.projectId)
+
       setAlertType("success")
       setAlertTitle("Success")
       setAlertMessage("Project deleted successfully!")
@@ -336,13 +335,13 @@ export default function ProjectDetailsPage() {
 
     setUploading(true)
     try {
-      await projectApi.reactivateProject(projectDetails.projectId)
-      
+      await projectApi.activateProject(projectDetails.projectId)
+
       setAlertType("success")
       setAlertTitle("Success")
       setAlertMessage("Project reactivated successfully!")
       setAlertOpen(true)
-      
+
       // Refresh project details to update status
       await fetchProjectDetails(projectDetails.projectId)
     } catch (err) {
@@ -659,7 +658,7 @@ export default function ProjectDetailsPage() {
               </Button>
             </div>
             <div className="flex items-center space-x-2">
-              <Button 
+              <Button
                 onClick={() => setChatOpen(true)}
                 disabled={projectDetails.status === "INACTIVE"}
                 className={projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
@@ -684,7 +683,7 @@ export default function ProjectDetailsPage() {
                   </Button>
                 </div>
               ) : (
-                <Button 
+                <Button
                   onClick={handleEnterEditMode}
                   disabled={projectDetails.status === "INACTIVE"}
                   className={projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
@@ -854,9 +853,9 @@ export default function ProjectDetailsPage() {
                     disabled={projectDetails.status === "INACTIVE"}
                     className={`w-64 ${projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}`}
                   />
-                  <Button 
-                    variant="outline" 
-                    onClick={handleAddFilesClick} 
+                  <Button
+                    variant="outline"
+                    onClick={handleAddFilesClick}
                     disabled={uploading || projectDetails.status === "INACTIVE"}
                     className={projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
                   >
@@ -929,8 +928,8 @@ export default function ProjectDetailsPage() {
                           <TableCell className="align-middle">
                             <span
                               className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${file.type === "document"
-                                  ? "bg-blue-100 text-blue-800 border-blue-200"
-                                  : "bg-purple-100 text-purple-800 border-purple-200"
+                                ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : "bg-purple-100 text-purple-800 border-purple-200"
                                 }`}
                             >
                               {file.type === "document" ? "Document" : "Video"}
@@ -980,9 +979,9 @@ export default function ProjectDetailsPage() {
                           </TableCell>
                           <TableCell className="align-middle">{getStatusBadge(file.status)}</TableCell>
                           <TableCell className="align-middle">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleDownloadFile(file)}
                               disabled={projectDetails.status === "INACTIVE"}
                               className={projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
@@ -1063,15 +1062,14 @@ export default function ProjectDetailsPage() {
                 {projectDetails.members.map((member: Member) => (
                   <div
                     key={member.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
-                      member.role === "CREATOR"
+                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${member.role === "CREATOR"
                         ? "border-purple-200 bg-purple-50 hover:bg-purple-100"
                         : member.role === "LEADER"
-                        ? "border-yellow-200 bg-yellow-50 hover:bg-yellow-100"
-                        : selectedMembers.includes(member.id)
-                        ? "border-red-200 bg-red-50"
-                        : "border-slate-200 bg-white hover:bg-slate-50"
-                    }`}
+                          ? "border-yellow-200 bg-yellow-50 hover:bg-yellow-100"
+                          : selectedMembers.includes(member.id)
+                            ? "border-red-200 bg-red-50"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                      }`}
                   >
                     <div className="flex items-center space-x-3">
                       {editMode && member.role !== "CREATOR" && (
@@ -1081,13 +1079,12 @@ export default function ProjectDetailsPage() {
                         />
                       )}
                       <div
-                        className={`h-12 w-12 rounded-full flex items-center justify-center ${
-                          member.role === "CREATOR"
+                        className={`h-12 w-12 rounded-full flex items-center justify-center ${member.role === "CREATOR"
                             ? "bg-purple-100 text-purple-700"
                             : member.role === "LEADER"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-blue-100 text-blue-700"
-                        }`}
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
                       >
                         {member.role === "CREATOR" ? (
                           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1128,13 +1125,12 @@ export default function ProjectDetailsPage() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
-                          member.role === "CREATOR"
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${member.role === "CREATOR"
                             ? "bg-purple-100 text-purple-800 border-purple-200"
                             : member.role === "LEADER"
-                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                            : "bg-blue-100 text-blue-800 border-blue-200"
-                        }`}
+                              ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                              : "bg-blue-100 text-blue-800 border-blue-200"
+                          }`}
                       >
                         {member.role}
                       </span>
@@ -1221,24 +1217,9 @@ export default function ProjectDetailsPage() {
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-red-900 mb-2">Delete Project</h3>
                     <p className="text-sm text-red-700 mb-4">
-                      This action cannot be undone. This will permanently delete the project, all its files, and remove all team members.
+                      Deletion requires activation by the project creator. Once deleted, the project will become unavailable to all members.
                     </p>
                     <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-red-700 mb-2 block">
-                          Reason for deletion (optional)
-                        </label>
-                        <textarea
-                          value={deleteReason}
-                          onChange={(e) => setDeleteReason(e.target.value)}
-                          placeholder="Optionally provide a reason for deleting this project..."
-                          className="w-full min-h-[80px] px-3 py-2 border border-red-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none bg-white text-slate-700"
-                          maxLength={500}
-                        />
-                        <div className="text-xs text-red-600 mt-1">
-                          {deleteReason.length}/500 characters
-                        </div>
-                      </div>
                       <div>
                         <label className="text-sm font-medium text-red-700 mb-2 block">
                           Type the project name "<strong>{projectDetails.projectName}</strong>" to confirm:
@@ -1270,10 +1251,10 @@ export default function ProjectDetailsPage() {
       <Dialog open={alertOpen} onOpenChange={setAlertOpen}>
         <DialogContent
           className={`${alertType === "error"
-              ? "border-red-200"
-              : alertType === "warning"
-                ? "border-yellow-200"
-                : "border-green-200"
+            ? "border-red-200"
+            : alertType === "warning"
+              ? "border-yellow-200"
+              : "border-green-200"
             }`}
         >
           <DialogHeader>
@@ -1337,28 +1318,28 @@ export default function ProjectDetailsPage() {
       )}
 
       {/* Chat Panel */}
-  {chatOpen && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="relative w-full max-w-5xl mx-auto">
-        <ChatPanel
-          projectId={projectDetails?.projectId || ""}
-          selectedFiles={projectDetails ? getAllFiles().map(f => ({ 
-            id: f.id, 
-            name: f.fileName, 
-            icon: '',
-            type: f.type
-          })) : []}
-        />
-        <button
-          className="absolute top-4 right-4 bg-white/80 rounded-full p-2 shadow hover:bg-white"
-          onClick={() => setChatOpen(false)}
-        >
-          <svg className="h-5 w-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-    </div>
+      {chatOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="relative w-full max-w-5xl mx-auto">
+            <ChatPanel
+              projectId={projectDetails?.projectId || ""}
+              selectedFiles={projectDetails ? getAllFiles().map(f => ({
+                id: f.id,
+                name: f.fileName,
+                icon: '',
+                type: f.type
+              })) : []}
+            />
+            <button
+              className="absolute top-4 right-4 bg-white/80 rounded-full p-2 shadow hover:bg-white"
+              onClick={() => setChatOpen(false)}
+            >
+              <svg className="h-5 w-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
