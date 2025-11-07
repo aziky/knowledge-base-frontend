@@ -1,3 +1,6 @@
+import axios from 'axios';
+import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
+
 // Chat API functions (chat-service)
 const chatServiceClient = axios.create({
   baseURL: 'http://localhost:7075/api',
@@ -12,8 +15,8 @@ export const chatApi = {
     try {
       // If document_ids or video_ids is not empty, remove project_id from payload
       const sendPayload = { ...payload };
-      if ((sendPayload.document_ids && sendPayload.document_ids.length > 0) || 
-          (sendPayload.video_ids && sendPayload.video_ids.length > 0)) {
+      if ((sendPayload.document_ids && sendPayload.document_ids.length > 0) ||
+        (sendPayload.video_ids && sendPayload.video_ids.length > 0)) {
         delete sendPayload.project_id;
       }
       console.log('Chat ask payload:', JSON.stringify(sendPayload));
@@ -29,7 +32,7 @@ export const chatApi = {
       throw { message: 'Network error occurred' } as ApiError;
     }
   },
-  
+
   getConversations: async () => {
     try {
       const response = await chatServiceClient.get(`/chat`);
@@ -44,7 +47,7 @@ export const chatApi = {
       throw { message: 'Network error occurred' } as ApiError;
     }
   },
-  
+
   getConversationMessages: async (conversationId: string) => {
     try {
       const response = await chatServiceClient.get(`/chat/${conversationId}`);
@@ -60,8 +63,6 @@ export const chatApi = {
     }
   },
 };
-import axios from 'axios';
-import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
 
 const API_BASE_URL = 'http://localhost:7070';
 
@@ -370,6 +371,24 @@ export const projectApi = {
     }
   },
 
+  // Activate project
+  activateProject: async (projectId: string): Promise<void> => {
+    try {
+
+      await projectServiceClient.patch(`/project/${projectId}`);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to reactivate project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
   // Invite users to project
   inviteUsersToProject: async (projectId: string, invitationUsers: InvitationUser[]): Promise<ProjectInvitationResponse> => {
     try {
@@ -379,6 +398,26 @@ export const projectApi = {
       if (axios.isAxiosError(error)) {
         throw {
           message: error.response?.data?.message || 'Failed to invite users to project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Remove members from project
+  removeMembersFromProject: async (projectId: string, memberIds: string[]): Promise<void> => {
+    try {
+      const response = await projectServiceClient.delete(`/project/${projectId}/members`, {
+        data: { memberIds },
+      });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to remove members from project',
           status: error.response?.status,
         } as ApiError;
       }
@@ -453,11 +492,11 @@ export const projectApi = {
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
-      
+
       // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       return true;
     } catch (error) {
       if (axios.isAxiosError(error)) {

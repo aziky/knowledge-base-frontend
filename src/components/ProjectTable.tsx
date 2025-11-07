@@ -47,6 +47,45 @@ export function ProjectTable() {
     return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
   }
 
+  const formatDateTime = (dateString: string) => {
+    try {
+      // Handle different date formats that might come from the API
+      let date: Date
+      
+      // If it's in DD-MM-YYYY format, convert it
+      if (dateString.includes('-') && dateString.split('-').length === 3) {
+        const parts = dateString.split('-')
+        if (parts[0].length === 2) {
+          // DD-MM-YYYY format
+          date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+        } else {
+          // YYYY-MM-DD format
+          date = new Date(dateString)
+        }
+      } else {
+        date = new Date(dateString)
+      }
+
+      if (isNaN(date.getTime())) {
+        return dateString // Return original if parsing fails
+      }
+
+      // Format to show both date and time
+      const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }
+      
+      return date.toLocaleDateString('en-US', options)
+    } catch {
+      return dateString // Return original if any error occurs
+    }
+  }
+
   const columns: ColumnDef<Project>[] = [
     {
       accessorKey: "projectName",
@@ -123,14 +162,58 @@ export function ProjectTable() {
           </svg>
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="flex items-center space-x-2">
-          <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      cell: ({ row }) => {
+        const joinedAt = row.getValue("joinedAt") as string
+        const formattedDate = formatDateTime(joinedAt)
+        return (
+          <div className="flex items-center space-x-2">
+            <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-slate-600 font-medium">{formattedDate}</span>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "lockedAt",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-semibold text-slate-700 hover:text-slate-900"
+        >
+          Locked At
+          <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
           </svg>
-          <span className="text-slate-600">{row.getValue("joinedAt")}</span>
-        </div>
+        </Button>
       ),
+      cell: ({ row }) => {
+        const lockedAt = row.getValue("lockedAt") as string | null
+        const isLocked = lockedAt !== null
+        
+        if (!isLocked) {
+          return (
+            <div className="flex items-center space-x-2">
+              <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+              </svg>
+              <span className="text-green-600 font-medium">Active</span>
+            </div>
+          )
+        }
+
+        const formattedDate = formatDateTime(lockedAt)
+        return (
+          <div className="flex items-center space-x-2">
+            <svg className="h-4 w-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="text-red-600 font-medium">{formattedDate}</span>
+          </div>
+        )
+      },
     },
     {
       id: "actions",
@@ -269,22 +352,24 @@ export function ProjectTable() {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className="hover:bg-slate-50/50 transition-colors border-b border-slate-100"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-4">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    className="transition-colors border-b border-slate-100 hover:bg-slate-50/50"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="py-4">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell
