@@ -1062,7 +1062,9 @@ export default function ProjectDetailsPage() {
                 {projectDetails.members.map((member: Member) => (
                   <div
                     key={member.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${member.role === "CREATOR"
+                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
+                      editMode && member.role !== "CREATOR" ? "cursor-pointer" : ""
+                    } ${member.role === "CREATOR"
                         ? "border-purple-200 bg-purple-50 hover:bg-purple-100"
                         : member.role === "LEADER"
                           ? "border-yellow-200 bg-yellow-50 hover:bg-yellow-100"
@@ -1070,12 +1072,18 @@ export default function ProjectDetailsPage() {
                             ? "border-red-200 bg-red-50"
                             : "border-slate-200 bg-white hover:bg-slate-50"
                       }`}
+                    onClick={() => {
+                      if (editMode && member.role !== "CREATOR") {
+                        handleMemberSelect(member.id, !selectedMembers.includes(member.id))
+                      }
+                    }}
                   >
                     <div className="flex items-center space-x-3">
                       {editMode && member.role !== "CREATOR" && (
                         <Checkbox
                           checked={selectedMembers.includes(member.id)}
                           onCheckedChange={(checked) => handleMemberSelect(member.id, checked as boolean)}
+                          onClick={(e) => e.stopPropagation()} // Prevent double-triggering when clicking the checkbox directly
                         />
                       )}
                       <div
@@ -1134,12 +1142,6 @@ export default function ProjectDetailsPage() {
                       >
                         {member.role}
                       </span>
-                      {editMode && member.role !== "CREATOR" && (
-                        <Checkbox
-                          checked={selectedMembers.includes(member.id)}
-                          onCheckedChange={(checked) => handleMemberSelect(member.id, checked as boolean)}
-                        />
-                      )}
                     </div>
                   </div>
                 ))}
