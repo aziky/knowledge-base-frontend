@@ -20,6 +20,8 @@ export interface Project {
   projectRole: string
   joinedAt: string
   removedAt: string | null
+  status: string
+  lockedAt: string | null
 }
 
 export interface ProjectListResponse {
@@ -70,6 +72,9 @@ export interface ProjectDetails {
   projectName: string
   description: string
   createdAt: string
+  status: string
+  userRole: string
+  lockedAt: string | null
   members: Member[]
   folders: Folder[]
   documents: Document[]

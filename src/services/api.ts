@@ -354,13 +354,33 @@ export const projectApi = {
   },
 
   // Delete project
-  deleteProject: async (projectId: string): Promise<void> => {
+  deleteProject: async (projectId: string, reason?: string): Promise<void> => {
     try {
-      await projectServiceClient.delete(`/project/${projectId}`);
+      const payload = reason ? { lockReason: reason } : undefined;
+      console.log("request payload for delete {}", JSON.stringify(payload));
+
+      await projectServiceClient.delete(`/project/${projectId}`, { data: payload });
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw {
           message: error.response?.data?.message || 'Failed to delete project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Reactivate project
+  reactivateProject: async (projectId: string): Promise<void> => {
+    try {
+      await projectServiceClient.put(`/project/${projectId}/reactivate`);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to reactivate project',
           status: error.response?.status,
         } as ApiError;
       }
@@ -379,6 +399,26 @@ export const projectApi = {
       if (axios.isAxiosError(error)) {
         throw {
           message: error.response?.data?.message || 'Failed to invite users to project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw {
+        message: 'Network error occurred',
+      } as ApiError;
+    }
+  },
+
+  // Remove members from project
+  removeMembersFromProject: async (projectId: string, memberIds: string[]): Promise<void> => {
+    try {
+      const response = await projectServiceClient.delete(`/project/${projectId}/members`, {
+        data: { memberIds },
+      });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to remove members from project',
           status: error.response?.status,
         } as ApiError;
       }
