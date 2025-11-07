@@ -707,6 +707,37 @@ export default function ProjectDetailsPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Inactive Project Banner */}
+        {projectDetails.status === "INACTIVE" && (
+          <Card className="mb-8 shadow-xl border-0 bg-red-50/80 backdrop-blur-sm border-red-200">
+            <CardHeader className="border-b border-red-200 bg-gradient-to-r from-red-50 to-red-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <div>
+                    <CardTitle className="text-xl text-red-900">Project Inactive</CardTitle>
+                    <CardDescription className="text-red-700 mt-1">
+                      This project has been deactivated{projectDetails.lockedAt ? ` on ${formatDate(projectDetails.lockedAt)}` : ""}.
+                      {projectDetails.userRole === "CREATOR" ? " As the creator, you can reactivate it." : " Only the project creator can reactivate it."}
+                    </CardDescription>
+                  </div>
+                </div>
+                {projectDetails.userRole === "CREATOR" && (
+                  <Button
+                    onClick={handleReactivateProject}
+                    disabled={uploading}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {uploading ? "Reactivating..." : "Reactivate Project"}
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+          </Card>
+        )}
+
         {/* Project Info */}
         <Card className="mb-8 shadow-xl border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-white to-slate-50">
@@ -767,37 +798,6 @@ export default function ProjectDetailsPage() {
             </div>
           </CardHeader>
         </Card>
-
-        {/* Inactive Project Banner */}
-        {projectDetails.status === "INACTIVE" && (
-          <Card className="mb-8 shadow-xl border-0 bg-red-50/80 backdrop-blur-sm border-red-200">
-            <CardHeader className="border-b border-red-200 bg-gradient-to-r from-red-50 to-red-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  <div>
-                    <CardTitle className="text-xl text-red-900">Project Inactive</CardTitle>
-                    <CardDescription className="text-red-700 mt-1">
-                      This project has been deactivated{projectDetails.lockedAt ? ` on ${formatDate(projectDetails.lockedAt)}` : ""}.
-                      {projectDetails.userRole === "CREATOR" ? " As the creator, you can reactivate it." : " Only the project creator can reactivate it."}
-                    </CardDescription>
-                  </div>
-                </div>
-                {projectDetails.userRole === "CREATOR" && (
-                  <Button
-                    onClick={handleReactivateProject}
-                    disabled={uploading}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {uploading ? "Reactivating..." : "Reactivate Project"}
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-          </Card>
-        )}
 
         {/* Files Section */}
         <div className="space-y-8">
