@@ -18,7 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
-import { projectApi, type ApiError } from "@/services/api"
+import { projectApi, memberApi, type ApiError } from "@/services/api"
 import type { ProjectDetails, Member } from "@/types"
 
 export default function ProjectDetailsPage() {
@@ -26,6 +26,7 @@ export default function ProjectDetailsPage() {
   const [alertType, setAlertType] = useState<"success" | "error" | "warning">("success")
   const [alertMessage, setAlertMessage] = useState("")
   const [alertTitle, setAlertTitle] = useState("")
+  const [newMemberEmail, setNewMemberEmail] = useState("")
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [duplicateFiles, setDuplicateFiles] = useState<string[]>([])
   const [duplicateFileObjects, setDuplicateFileObjects] = useState<UnifiedFile[]>([])
@@ -42,6 +43,18 @@ export default function ProjectDetailsPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
+  const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Pagination and search states
+  const [filesPage, setFilesPage] = useState(1)
+  const [filesSearch, setFilesSearch] = useState("")
+  const [fileTypeFilter, setFileTypeFilter] = useState<"all" | "document" | "video">("all")
+  const itemsPerPage = 10
 
   // Handler to trigger file input
   const handleAddFilesClick = () => {
@@ -149,6 +162,73 @@ export default function ProjectDetailsPage() {
     }
   }
 
+  const renderProjectContent = () => {
+    if (editMode) {
+      return (
+        <div className="space-y-4"> <div>
+          <label className="text-sm font-medium text-slate-700 mb-2 block"> Project Name </label>
+          <Input value={editingProjectName}
+            onChange={(e) => setEditingProjectName(e.target.value)}
+            placeholder="Enter project name"
+            className="text-2xl font-bold border-2 border-blue-200 focus:border-blue-500" /> </div>
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-2 block"> Description </label>
+            <textarea value={editingProjectDescription}
+              onChange={(e) => setEditingProjectDescription(e.target.value)}
+              placeholder="Enter project description"
+              className="w-full min-h-[80px] px-3 py-2 border-2 border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-slate-600" />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <CardTitle className="text-3xl font-bold text-slate-900">{projectDetails?.projectName}</CardTitle>
+        <CardDescription className="text-lg text-slate-600 mt-2">{projectDetails?.description}</CardDescription>
+      </>
+    )
+  };
+
+  const renderProjectControls = (projectDetails: ProjectDetails) => {
+
+    if (projectDetails.userRole === 'MEMBER') {
+      return null
+    }
+
+    if (editMode) {
+      return (
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={handleExitEditMode}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveProjectInfo} disabled={uploading}>
+            {uploading ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      )
+    } else {
+      return (
+        <Button
+          onClick={handleEnterEditMode}
+          disabled={projectDetails.status === "INACTIVE"}
+          className={projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
+        >
+          <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2V8l-6-6z"
+            />
+          </svg>
+          {projectDetails.status === "INACTIVE" ? "Project Inactive" : "Edit Project"}
+        </Button>
+      )
+    }
+  }
+
+
   // Handler for closing alert without replacing
   const handleAlertClose = () => {
     setAlertOpen(false)
@@ -179,6 +259,43 @@ export default function ProjectDetailsPage() {
       setAlertType("error")
       setAlertTitle("Download Error")
       setAlertMessage(apiError.message || "Failed to download file")
+      setAlertOpen(true)
+    }
+  }
+
+  // Member management handlers
+  const handleAddMember = async (email: string) => {
+    if (!projectId) return
+    try {
+      await memberApi.addMember(projectId, email)
+      await fetchProjectDetails(projectId)
+      setAlertType("success")
+      setAlertTitle("Member Added")
+      setAlertMessage("Member has been added successfully!")
+      setAlertOpen(true)
+    } catch (err) {
+      const apiError = err as ApiError
+      setAlertType("error")
+      setAlertTitle("Add Member Error")
+      setAlertMessage(apiError.message || "Failed to add member")
+      setAlertOpen(true)
+    }
+  }
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!projectId) return
+    try {
+      await memberApi.removeMember(projectId, memberId)
+      await fetchProjectDetails(projectId)
+      setAlertType("success")
+      setAlertTitle("Member Removed")
+      setAlertMessage("Member has been removed successfully!")
+      setAlertOpen(true)
+    } catch (err) {
+      const apiError = err as ApiError
+      setAlertType("error")
+      setAlertTitle("Remove Member Error")
+      setAlertMessage(apiError.message || "Failed to remove member")
       setAlertOpen(true)
     }
   }
@@ -240,7 +357,9 @@ export default function ProjectDetailsPage() {
 
       // 3. Remove selected members if any
       if (selectedMembers.length > 0) {
-        await projectApi.removeMembersFromProject(projectDetails.projectId, selectedMembers)
+        for (const memberId of selectedMembers) {
+          await handleRemoveMember(memberId);
+        }
       }
 
       // Refresh project details and exit edit mode
@@ -355,17 +474,7 @@ export default function ProjectDetailsPage() {
     }
   }
 
-  const { projectId } = useParams<{ projectId: string }>()
-  const navigate = useNavigate()
-  const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  // Pagination and search states
-  const [filesPage, setFilesPage] = useState(1)
-  const [filesSearch, setFilesSearch] = useState("")
-  const [fileTypeFilter, setFileTypeFilter] = useState<"all" | "document" | "video">("all")
-  const itemsPerPage = 10
 
   // Unified file interface
   interface UnifiedFile {
@@ -673,32 +782,7 @@ export default function ProjectDetailsPage() {
                 </svg>
                 {projectDetails.status === "INACTIVE" ? "Project Inactive" : "Chat"}
               </Button>
-              {editMode ? (
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={handleExitEditMode}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveProjectInfo} disabled={uploading}>
-                    {uploading ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  onClick={handleEnterEditMode}
-                  disabled={projectDetails.status === "INACTIVE"}
-                  className={projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
-                >
-                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2V8l-6-6z"
-                    />
-                  </svg>
-                  {projectDetails.status === "INACTIVE" ? "Project Inactive" : "Edit Project"}
-                </Button>
-              )}
+              {renderProjectControls(projectDetails)}
             </div>
           </div>
         </div>
@@ -740,37 +824,7 @@ export default function ProjectDetailsPage() {
         {/* Project Info */}
         <Card className="mb-8 shadow-xl border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-white to-slate-50">
-            {editMode ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
-                    Project Name
-                  </label>
-                  <Input
-                    value={editingProjectName}
-                    onChange={(e) => setEditingProjectName(e.target.value)}
-                    placeholder="Enter project name"
-                    className="text-2xl font-bold border-2 border-blue-200 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
-                    Description
-                  </label>
-                  <textarea
-                    value={editingProjectDescription}
-                    onChange={(e) => setEditingProjectDescription(e.target.value)}
-                    placeholder="Enter project description"
-                    className="w-full min-h-[80px] px-3 py-2 border-2 border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-slate-600"
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <CardTitle className="text-3xl font-bold text-slate-900">{projectDetails.projectName}</CardTitle>
-                <CardDescription className="text-lg text-slate-600 mt-2">{projectDetails.description}</CardDescription>
-              </>
-            )}
+            {renderProjectContent()}
             <div className="flex items-center space-x-6 mt-4 text-sm text-slate-500">
               <div className="flex items-center space-x-2">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1035,20 +1089,43 @@ export default function ProjectDetailsPage() {
         </div>
 
         {/* Members Section */}
-        {projectDetails.members.length > 0 && (
+        {(projectDetails.members.length > 0 || editMode) && (
           <Card className="mt-8 shadow-xl border-0 bg-white/80 backdrop-blur-sm">
             <CardHeader className="border-b border-slate-200">
-              <CardTitle className="flex items-center text-xl">
-                <svg className="h-5 w-5 mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-                Team Members ({projectDetails.members.length})
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center text-xl">
+                  <svg className="h-5 w-5 mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                  Team Members ({projectDetails.members.length})
+                </CardTitle>
+                {editMode && (
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      placeholder="Enter member email"
+                      value={newMemberEmail}
+                      onChange={(e) => setNewMemberEmail(e.target.value)}
+                      className="w-64"
+                    />
+                    <Button
+                      onClick={async () => {
+                        if (newMemberEmail) {
+                          await handleAddMember(newMemberEmail);
+                          setNewMemberEmail("");
+                        }
+                      }}
+                      disabled={!newMemberEmail}
+                    >
+                      Add Member
+                    </Button>
+                  </div>
+                )}
+              </div>
               {editMode && selectedMembers.length > 0 && (
                 <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
                   <span className="text-sm font-medium text-red-700">
@@ -1062,9 +1139,8 @@ export default function ProjectDetailsPage() {
                 {projectDetails.members.map((member: Member) => (
                   <div
                     key={member.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
-                      editMode && member.role !== "CREATOR" ? "cursor-pointer" : ""
-                    } ${member.role === "CREATOR"
+                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${editMode && member.role !== "CREATOR" ? "cursor-pointer" : ""
+                      } ${member.role === "CREATOR"
                         ? "border-purple-200 bg-purple-50 hover:bg-purple-100"
                         : member.role === "LEADER"
                           ? "border-yellow-200 bg-yellow-50 hover:bg-yellow-100"
@@ -1088,10 +1164,10 @@ export default function ProjectDetailsPage() {
                       )}
                       <div
                         className={`h-12 w-12 rounded-full flex items-center justify-center ${member.role === "CREATOR"
-                            ? "bg-purple-100 text-purple-700"
-                            : member.role === "LEADER"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-blue-100 text-blue-700"
+                          ? "bg-purple-100 text-purple-700"
+                          : member.role === "LEADER"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-blue-100 text-blue-700"
                           }`}
                       >
                         {member.role === "CREATOR" ? (
@@ -1134,10 +1210,10 @@ export default function ProjectDetailsPage() {
                     <div className="flex items-center space-x-2">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${member.role === "CREATOR"
-                            ? "bg-purple-100 text-purple-800 border-purple-200"
-                            : member.role === "LEADER"
-                              ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                              : "bg-blue-100 text-blue-800 border-blue-200"
+                          ? "bg-purple-100 text-purple-800 border-purple-200"
+                          : member.role === "LEADER"
+                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            : "bg-blue-100 text-blue-800 border-blue-200"
                           }`}
                       >
                         {member.role}
