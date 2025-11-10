@@ -184,9 +184,11 @@ export const memberApi = {
     }
   },
 
-  removeMember: async (projectId: string, memberId: string): Promise<ApiResponse<void>> => {
+  removeMembers: async (projectId: string, memberIds: string[]): Promise<ApiResponse<void>> => {
     try {
-      const response = await projectServiceClient.delete(`/projects/${projectId}/members/${memberId}`);
+      const response = await projectServiceClient.delete(`/project/${projectId}/members`, {
+        data: { memberIds }
+      });
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -202,6 +204,24 @@ export const memberApi = {
   getMembers: async (projectId: string): Promise<ApiResponse<Member[]>> => {
     try {
       const response = await projectServiceClient.get(`/projects/${projectId}/members`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to get project members',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: 'Network error occurred' } as ApiError;
+    }
+  },
+
+
+  searchUsers: async (searchTerm: string): Promise<ApiResponse<User[]>> => {
+    try {
+      const response = await userServiceClient.get(`/user/search`, {
+        params: { query: searchTerm }
+      });
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
