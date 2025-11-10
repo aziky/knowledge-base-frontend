@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
 import { projectApi, memberApi, type ApiError } from "@/services/api"
-import type { ProjectDetails, Member, User } from "@/types"
+import type { ProjectDetails, Member, User, InvitationUser } from "@/types"
 
 import { useMemo } from 'react'
 import debounce from 'lodash/debounce'
@@ -37,6 +37,8 @@ export default function ProjectDetailsPage() {
   const [searchEmail, setSearchEmail] = useState("")
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [selectedUsersToAdd, setSelectedUsersToAdd] = useState<string[]>([])
+  const [inviteLoading, setInviteLoading] = useState(false)
 
   // Inline editing states
   const [editingProjectName, setEditingProjectName] = useState("")
@@ -331,23 +333,53 @@ export default function ProjectDetailsPage() {
   }
 
   // Member management handlers
-  const handleAddMember = async (email: string) => {
-    if (!projectId) return
+  const handleAddMembers = async () => {
+    if (!projectId || selectedUsersToAdd.length === 0) return
     try {
-      await memberApi.addMember(projectId, email)
+      setInviteLoading(true)
+      const usersToAdd : InvitationUser[] = searchResults.filter(user => selectedUsersToAdd.includes(user.email))
+                                      .map(user => ({ ...user, role: "MEMBER", userId: user.id }))
+      await projectApi.inviteUsersToProject(projectId, usersToAdd)
       await fetchProjectDetails(projectId)
+
       setAlertType("success")
-      setAlertTitle("Member Added")
-      setAlertMessage("Member has been added successfully!")
+      setAlertTitle("Members Added")
+      setAlertMessage(`Successfully added ${selectedUsersToAdd.length} member(s)`)
       setAlertOpen(true)
+
+      // Reset selection and search
+      setSelectedUsersToAdd([])
+      setSearchEmail("")
+      setSearchResults([])
     } catch (err) {
       const apiError = err as ApiError
       setAlertType("error")
-      setAlertTitle("Add Member Error")
-      setAlertMessage(apiError.message || "Failed to add member")
+      setAlertTitle("Add Members Error")
+      setAlertMessage(apiError.message || "Failed to add members")
       setAlertOpen(true)
+    } finally {
+      setInviteLoading(false)
+      setEditMode(false)
     }
   }
+
+  // const handleAddMember = async (user: User) => {
+  //   if (!projectId) return
+  //   try {
+  //     await memberApi.addMember(projectId, email)
+  //     await fetchProjectDetails(projectId)
+  //     setAlertType("success")
+  //     setAlertTitle("Member Added")
+  //     setAlertMessage("Member has been added successfully!")
+  //     setAlertOpen(true)
+  //   } catch (err) {
+  //     const apiError = err as ApiError
+  //     setAlertType("error")
+  //     setAlertTitle("Add Member Error")
+  //     setAlertMessage(apiError.message || "Failed to add member")
+  //     setAlertOpen(true)
+  //   }
+  // }
 
   const handleRemoveMembers = async (members: string[]) => {
     if (!projectId) return
@@ -484,7 +516,9 @@ export default function ProjectDetailsPage() {
       setIsSearching(true);
       try {
         const results = await memberApi.searchUsers(searchTerm);
+        console.log("Search results:", JSON.stringify(results.data));
         setSearchResults(results.data);
+        
       } catch (error) {
         console.error('Error searching users:', error);
         setSearchResults([]);
@@ -845,6 +879,15 @@ export default function ProjectDetailsPage() {
           </Button>
         </div>
       </div>
+    )
+  }
+
+  // Add this function before the return statement
+  const handleToggleUserSelection = (email: string) => {
+    setSelectedUsersToAdd(prev =>
+      prev.includes(email)
+        ? prev.filter(e => e !== email)
+        : [...prev, email]
     )
   }
 
@@ -1260,15 +1303,17 @@ export default function ProjectDetailsPage() {
                           <div
                             key={user.email}
                             className="flex items-center justify-between p-3 hover:bg-slate-50"
+                            onClick={() => !isExistingMember && handleToggleUserSelection(user.email)}
                           >
                             <div className="flex items-center space-x-3">
+                              <Checkbox
+                                checked={selectedUsersToAdd.includes(user.email)}
+                                onCheckedChange={() => !isExistingMember && handleToggleUserSelection(user.email)}
+                                disabled={isExistingMember}
+                                onClick={(e) => e.stopPropagation()}
+                              />
                               <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                <svg
-                                  className="h-5 w-5 text-blue-600"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
+                                <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
@@ -1282,17 +1327,38 @@ export default function ProjectDetailsPage() {
                                 <div className="text-sm text-slate-500">{user.email}</div>
                               </div>
                             </div>
-                            <Button
-                              variant={isExistingMember ? "outline" : "default"}
-                              size="sm"
-                              onClick={() => !isExistingMember && handleAddMember(user.email)}
-                              disabled={isExistingMember}
+                            <span
+                              className={`px-3 py-1 text-sm rounded-full ${
+                                isExistingMember
+                                  ? "bg-gray-100 text-gray-600"
+                                  : selectedUsersToAdd.includes(user.email)
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
                             >
-                              {isExistingMember ? "Already Added" : "Add Member"}
-                            </Button>
+                              {isExistingMember 
+                                ? "Already Member" 
+                                : selectedUsersToAdd.includes(user.email)
+                                ? "Selected"
+                                : "Available"}
+                            </span>
                           </div>
                         );
                       })}
+                      {selectedUsersToAdd.length > 0 && (
+                        <div className="flex items-center justify-between p-4 bg-blue-50 border-t border-blue-200">
+                          <span className="text-sm font-medium text-blue-700">
+                            {selectedUsersToAdd.length} user{selectedUsersToAdd.length > 1 ? 's' : ''} selected
+                          </span>
+                          <Button
+                            onClick={handleAddMembers}
+                            disabled={uploading}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            {uploading ? "Adding..." : `Add Selected Member${selectedUsersToAdd.length > 1 ? 's' : ''}`}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1474,6 +1540,16 @@ export default function ProjectDetailsPage() {
             <div className="space-y-3 px-6 py-4 bg-slate-50 rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-slate-700">Uploading files...</span>
+                <span className="text-sm font-semibold text-blue-600">{Math.round(uploadProgress)}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-3" />
+            </div>
+          )}
+
+          {inviteLoading && (
+            <div className="space-y-3 px-6 py-4 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">Inviting users...</span>
                 <span className="text-sm font-semibold text-blue-600">{Math.round(uploadProgress)}%</span>
               </div>
               <Progress value={uploadProgress} className="h-3" />

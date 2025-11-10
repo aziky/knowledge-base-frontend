@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser, Member } from '@/types';
+import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, InvitationUser, Member } from '@/types';
 
 // Chat API functions (chat-service)
 const chatServiceClient = axios.create({
@@ -458,7 +458,7 @@ export const projectApi = {
   },
 
   // Invite users to project
-  inviteUsersToProject: async (projectId: string, invitationUsers: InvitationUser[]): Promise<ProjectInvitationResponse> => {
+  inviteUsersToProject: async (projectId: string, invitationUsers: InvitationUser[]) => {
     try {
       const response = await projectServiceClient.post(`/project/${projectId}/invite`, invitationUsers);
       return response.data;
