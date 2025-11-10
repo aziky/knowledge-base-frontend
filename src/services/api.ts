@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, ProjectInvitationResponse, InvitationUser } from '@/types';
+import type { ApiResponse, Project, ProjectListResponse, ProjectDetails, User, InvitationUser, Member } from '@/types';
 
 // Chat API functions (chat-service)
 const chatServiceClient = axios.create({
@@ -166,6 +166,74 @@ export interface ApiError {
   message: string;
   status?: number;
 }
+
+// Project members API
+export const memberApi = {
+  addMember: async (projectId: string, email: string): Promise<ApiResponse<Member>> => {
+    try {
+      const response = await projectServiceClient.post(`/projects/${projectId}/members`, { email });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to add member to project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: 'Network error occurred' } as ApiError;
+    }
+  },
+
+  removeMembers: async (projectId: string, memberIds: string[]): Promise<ApiResponse<void>> => {
+    try {
+      const response = await projectServiceClient.delete(`/project/${projectId}/members`, {
+        data: { memberIds }
+      });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to remove member from project',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: 'Network error occurred' } as ApiError;
+    }
+  },
+
+  getMembers: async (projectId: string): Promise<ApiResponse<Member[]>> => {
+    try {
+      const response = await projectServiceClient.get(`/projects/${projectId}/members`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to get project members',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: 'Network error occurred' } as ApiError;
+    }
+  },
+
+
+  searchUsers: async (searchTerm: string): Promise<ApiResponse<User[]>> => {
+    try {
+      const response = await userServiceClient.get(`/user/search`, {
+        params: { query: searchTerm }
+      });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw {
+          message: error.response?.data?.message || 'Failed to get project members',
+          status: error.response?.status,
+        } as ApiError;
+      }
+      throw { message: 'Network error occurred' } as ApiError;
+    }
+  },
+};
 
 // Types for projects
 export interface CreateProjectRequest {
@@ -390,7 +458,7 @@ export const projectApi = {
   },
 
   // Invite users to project
-  inviteUsersToProject: async (projectId: string, invitationUsers: InvitationUser[]): Promise<ProjectInvitationResponse> => {
+  inviteUsersToProject: async (projectId: string, invitationUsers: InvitationUser[]) => {
     try {
       const response = await projectServiceClient.post(`/project/${projectId}/invite`, invitationUsers);
       return response.data;

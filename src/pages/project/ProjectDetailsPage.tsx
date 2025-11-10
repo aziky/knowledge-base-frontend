@@ -18,8 +18,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat-panel"
-import { projectApi, type ApiError } from "@/services/api"
-import type { ProjectDetails, Member } from "@/types"
+import { projectApi, memberApi, type ApiError } from "@/services/api"
+import type { ProjectDetails, Member, User, InvitationUser } from "@/types"
+
+import { useMemo } from 'react'
+import debounce from 'lodash/debounce'
 
 export default function ProjectDetailsPage() {
   const [alertOpen, setAlertOpen] = useState(false)
@@ -31,6 +34,11 @@ export default function ProjectDetailsPage() {
   const [duplicateFileObjects, setDuplicateFileObjects] = useState<UnifiedFile[]>([])
   const [chatOpen, setChatOpen] = useState(false)
   const [editMode, setEditMode] = useState(false)
+  const [searchEmail, setSearchEmail] = useState("")
+  const [searchResults, setSearchResults] = useState<User[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedUsersToAdd, setSelectedUsersToAdd] = useState<string[]>([])
+  const [inviteLoading, setInviteLoading] = useState(false)
 
   // Inline editing states
   const [editingProjectName, setEditingProjectName] = useState("")
@@ -42,6 +50,18 @@ export default function ProjectDetailsPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
+  const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Pagination and search states
+  const [filesPage, setFilesPage] = useState(1)
+  const [filesSearch, setFilesSearch] = useState("")
+  const [fileTypeFilter, setFileTypeFilter] = useState<"all" | "document" | "video">("all")
+  const itemsPerPage = 10
 
   // Handler to trigger file input
   const handleAddFilesClick = () => {
@@ -149,6 +169,135 @@ export default function ProjectDetailsPage() {
     }
   }
 
+  const renderProjectContent = () => {
+    if (editMode) {
+      return (
+        <div className="space-y-4"> <div>
+          <label className="text-sm font-medium text-slate-700 mb-2 block"> Project Name </label>
+          <Input value={editingProjectName}
+            onChange={(e) => setEditingProjectName(e.target.value)}
+            placeholder="Enter project name"
+            className="text-2xl font-bold border-2 border-blue-200 focus:border-blue-500" /> </div>
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-2 block"> Description </label>
+            <textarea value={editingProjectDescription}
+              onChange={(e) => setEditingProjectDescription(e.target.value)}
+              placeholder="Enter project description"
+              className="w-full min-h-[80px] px-3 py-2 border-2 border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-slate-600" />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <CardTitle className="text-3xl font-bold text-slate-900">{projectDetails?.projectName}</CardTitle>
+        <CardDescription className="text-lg text-slate-600 mt-2">{projectDetails?.description}</CardDescription>
+      </>
+    )
+  };
+
+  const renderProjectControls = (projectDetails: ProjectDetails) => {
+
+    if (projectDetails.userRole === 'MEMBER') {
+      return null
+    }
+
+    if (editMode) {
+      return (
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={handleExitEditMode}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveProjectInfo} disabled={uploading}>
+            {uploading ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      )
+    } else {
+      return (
+        <Button
+          onClick={handleEnterEditMode}
+          disabled={projectDetails.status === "INACTIVE"}
+          className={projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
+        >
+          <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2V8l-6-6z"
+            />
+          </svg>
+          {projectDetails.status === "INACTIVE" ? "Project Inactive" : "Edit Project"}
+        </Button>
+      )
+    }
+  }
+
+  const renderDangerZone = () => {
+    if (editMode) return (
+      (
+        <Card className="mt-8 shadow-xl border-0 bg-red-50/80 backdrop-blur-sm border-red-200">
+          <CardHeader className="border-b border-red-200 bg-gradient-to-r from-red-50 to-red-100">
+            <CardTitle className="flex items-center text-xl text-red-900">
+              <svg className="h-5 w-5 mr-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+              Danger Zone
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="border border-red-300 rounded-lg p-6 bg-red-50">
+              <div className="flex items-start space-x-3">
+                <svg className="h-6 w-6 text-red-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-red-900 mb-2">Delete Project</h3>
+                  <p className="text-sm text-red-700 mb-4">
+                    Deletion requires activation by the project creator. Once deleted, the project will become unavailable to all members.
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-red-700 mb-2 block">
+                        Type the project name "<strong>{projectDetails?.projectName}</strong>" to confirm:
+                      </label>
+                      <Input
+                        value={deleteConfirmationText}
+                        onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                        placeholder={projectDetails?.projectName}
+                        className="border-red-300 focus:border-red-500 focus:ring-red-500 bg-white"
+                      />
+                    </div>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDeleteProject}
+                      disabled={deleteConfirmationText !== projectDetails?.projectName || uploading}
+                      className="w-full"
+                    >
+                      {uploading ? "Deleting..." : "I understand the consequences, delete this project"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    )
+  }
+
   // Handler for closing alert without replacing
   const handleAlertClose = () => {
     setAlertOpen(false)
@@ -179,6 +328,73 @@ export default function ProjectDetailsPage() {
       setAlertType("error")
       setAlertTitle("Download Error")
       setAlertMessage(apiError.message || "Failed to download file")
+      setAlertOpen(true)
+    }
+  }
+
+  // Member management handlers
+  const handleAddMembers = async () => {
+    if (!projectId || selectedUsersToAdd.length === 0) return
+    try {
+      setInviteLoading(true)
+      const usersToAdd : InvitationUser[] = searchResults.filter(user => selectedUsersToAdd.includes(user.email))
+                                      .map(user => ({ ...user, role: "MEMBER", userId: user.id }))
+      await projectApi.inviteUsersToProject(projectId, usersToAdd)
+      await fetchProjectDetails(projectId)
+
+      setAlertType("success")
+      setAlertTitle("Members Added")
+      setAlertMessage(`Successfully added ${selectedUsersToAdd.length} member(s)`)
+      setAlertOpen(true)
+
+      // Reset selection and search
+      setSelectedUsersToAdd([])
+      setSearchEmail("")
+      setSearchResults([])
+    } catch (err) {
+      const apiError = err as ApiError
+      setAlertType("error")
+      setAlertTitle("Add Members Error")
+      setAlertMessage(apiError.message || "Failed to add members")
+      setAlertOpen(true)
+    } finally {
+      setInviteLoading(false)
+      setEditMode(false)
+    }
+  }
+
+  // const handleAddMember = async (user: User) => {
+  //   if (!projectId) return
+  //   try {
+  //     await memberApi.addMember(projectId, email)
+  //     await fetchProjectDetails(projectId)
+  //     setAlertType("success")
+  //     setAlertTitle("Member Added")
+  //     setAlertMessage("Member has been added successfully!")
+  //     setAlertOpen(true)
+  //   } catch (err) {
+  //     const apiError = err as ApiError
+  //     setAlertType("error")
+  //     setAlertTitle("Add Member Error")
+  //     setAlertMessage(apiError.message || "Failed to add member")
+  //     setAlertOpen(true)
+  //   }
+  // }
+
+  const handleRemoveMembers = async (members: string[]) => {
+    if (!projectId) return
+    try {
+      await memberApi.removeMembers(projectId, members)
+      await fetchProjectDetails(projectId)
+      setAlertType("success")
+      setAlertTitle("Member Removed")
+      setAlertMessage("Member has been removed successfully!")
+      setAlertOpen(true)
+    } catch (err) {
+      const apiError = err as ApiError
+      setAlertType("error")
+      setAlertTitle("Remove Member Error")
+      setAlertMessage(apiError.message || "Failed to remove member")
       setAlertOpen(true)
     }
   }
@@ -240,8 +456,9 @@ export default function ProjectDetailsPage() {
 
       // 3. Remove selected members if any
       if (selectedMembers.length > 0) {
-        await projectApi.removeMembersFromProject(projectDetails.projectId, selectedMembers)
+        await handleRemoveMembers(selectedMembers);
       }
+
 
       // Refresh project details and exit edit mode
       await fetchProjectDetails(projectDetails.projectId)
@@ -286,6 +503,38 @@ export default function ProjectDetailsPage() {
       setSelectedFiles([])
     }
   }
+
+  // Debounced search function
+  const debouncedSearch = useMemo(
+    () => debounce(async (searchTerm: string) => {
+      if (!searchTerm.trim()) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const results = await memberApi.searchUsers(searchTerm);
+        console.log("Search results:", JSON.stringify(results.data));
+        setSearchResults(results.data);
+        
+      } catch (error) {
+        console.error('Error searching users:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300),
+    [setSearchResults, setIsSearching]
+  );
+
+  // Handle email search input
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchEmail(value);
+    debouncedSearch(value);
+  };
 
   // Handle member selection
   const handleMemberSelect = (memberId: string, checked: boolean) => {
@@ -355,17 +604,7 @@ export default function ProjectDetailsPage() {
     }
   }
 
-  const { projectId } = useParams<{ projectId: string }>()
-  const navigate = useNavigate()
-  const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  // Pagination and search states
-  const [filesPage, setFilesPage] = useState(1)
-  const [filesSearch, setFilesSearch] = useState("")
-  const [fileTypeFilter, setFileTypeFilter] = useState<"all" | "document" | "video">("all")
-  const itemsPerPage = 10
 
   // Unified file interface
   interface UnifiedFile {
@@ -643,6 +882,15 @@ export default function ProjectDetailsPage() {
     )
   }
 
+  // Add this function before the return statement
+  const handleToggleUserSelection = (email: string) => {
+    setSelectedUsersToAdd(prev =>
+      prev.includes(email)
+        ? prev.filter(e => e !== email)
+        : [...prev, email]
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Header */}
@@ -673,32 +921,7 @@ export default function ProjectDetailsPage() {
                 </svg>
                 {projectDetails.status === "INACTIVE" ? "Project Inactive" : "Chat"}
               </Button>
-              {editMode ? (
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={handleExitEditMode}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveProjectInfo} disabled={uploading}>
-                    {uploading ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  onClick={handleEnterEditMode}
-                  disabled={projectDetails.status === "INACTIVE"}
-                  className={projectDetails.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
-                >
-                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2V8l-6-6z"
-                    />
-                  </svg>
-                  {projectDetails.status === "INACTIVE" ? "Project Inactive" : "Edit Project"}
-                </Button>
-              )}
+              {renderProjectControls(projectDetails)}
             </div>
           </div>
         </div>
@@ -740,37 +963,7 @@ export default function ProjectDetailsPage() {
         {/* Project Info */}
         <Card className="mb-8 shadow-xl border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-white to-slate-50">
-            {editMode ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
-                    Project Name
-                  </label>
-                  <Input
-                    value={editingProjectName}
-                    onChange={(e) => setEditingProjectName(e.target.value)}
-                    placeholder="Enter project name"
-                    className="text-2xl font-bold border-2 border-blue-200 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
-                    Description
-                  </label>
-                  <textarea
-                    value={editingProjectDescription}
-                    onChange={(e) => setEditingProjectDescription(e.target.value)}
-                    placeholder="Enter project description"
-                    className="w-full min-h-[80px] px-3 py-2 border-2 border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-slate-600"
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <CardTitle className="text-3xl font-bold text-slate-900">{projectDetails.projectName}</CardTitle>
-                <CardDescription className="text-lg text-slate-600 mt-2">{projectDetails.description}</CardDescription>
-              </>
-            )}
+            {renderProjectContent()}
             <div className="flex items-center space-x-6 mt-4 text-sm text-slate-500">
               <div className="flex items-center space-x-2">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -801,6 +994,7 @@ export default function ProjectDetailsPage() {
         {/* Files Section */}
         <div className="space-y-8">
           {/* Unified Files */}
+          {/* Files Card */}
           <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
             <CardHeader className="border-b border-slate-200">
               <div className="flex items-center justify-between">
@@ -1035,20 +1229,22 @@ export default function ProjectDetailsPage() {
         </div>
 
         {/* Members Section */}
-        {projectDetails.members.length > 0 && (
+        {(projectDetails.members.length > 0 || editMode) && (
           <Card className="mt-8 shadow-xl border-0 bg-white/80 backdrop-blur-sm">
             <CardHeader className="border-b border-slate-200">
-              <CardTitle className="flex items-center text-xl">
-                <svg className="h-5 w-5 mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-                Team Members ({projectDetails.members.length})
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center text-xl">
+                  <svg className="h-5 w-5 mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                  Team Members ({projectDetails.members.length})
+                </CardTitle>
+              </div>
               {editMode && selectedMembers.length > 0 && (
                 <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
                   <span className="text-sm font-medium text-red-700">
@@ -1058,13 +1254,129 @@ export default function ProjectDetailsPage() {
               )}
             </CardHeader>
             <CardContent className="p-6">
+              {/* Add Member Search Section - Only show in edit mode */}
+              {editMode && (
+                <div className="mb-6 space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="relative flex-1">
+                      <Input
+                        placeholder="Search users by email"
+                        value={searchEmail}
+                        onChange={handleSearchChange}
+                        className="pr-8"
+                      />
+                      {isSearching && (
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                          <svg
+                            className="animate-spin h-5 w-5 text-slate-400"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            ></path>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Search Results */}
+                  {searchResults.length > 0 && (
+                    <div className="border rounded-lg divide-y">
+                      {searchResults.map((user) => {
+                        const isExistingMember = projectDetails.members.some(
+                          (member) => member.email === user.email
+                        );
+                        return (
+                          <div
+                            key={user.email}
+                            className="flex items-center justify-between p-3 hover:bg-slate-50"
+                            onClick={() => !isExistingMember && handleToggleUserSelection(user.email)}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <Checkbox
+                                checked={selectedUsersToAdd.includes(user.email)}
+                                onCheckedChange={() => !isExistingMember && handleToggleUserSelection(user.email)}
+                                disabled={isExistingMember}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                  />
+                                </svg>
+                              </div>
+                              <div>
+                                <div className="font-medium text-slate-900">{user.fullName}</div>
+                                <div className="text-sm text-slate-500">{user.email}</div>
+                              </div>
+                            </div>
+                            <span
+                              className={`px-3 py-1 text-sm rounded-full ${
+                                isExistingMember
+                                  ? "bg-gray-100 text-gray-600"
+                                  : selectedUsersToAdd.includes(user.email)
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {isExistingMember 
+                                ? "Already Member" 
+                                : selectedUsersToAdd.includes(user.email)
+                                ? "Selected"
+                                : "Available"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {selectedUsersToAdd.length > 0 && (
+                        <div className="flex items-center justify-between p-4 bg-blue-50 border-t border-blue-200">
+                          <span className="text-sm font-medium text-blue-700">
+                            {selectedUsersToAdd.length} user{selectedUsersToAdd.length > 1 ? 's' : ''} selected
+                          </span>
+                          <Button
+                            onClick={handleAddMembers}
+                            disabled={uploading}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            {uploading ? "Adding..." : `Add Selected Member${selectedUsersToAdd.length > 1 ? 's' : ''}`}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {searchEmail && !isSearching && searchResults.length === 0 && (
+                    <div className="text-center p-4 text-slate-500">
+                      No users found matching "{searchEmail}"
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Existing members grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {projectDetails.members.map((member: Member) => (
                   <div
                     key={member.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
-                      editMode && member.role !== "CREATOR" ? "cursor-pointer" : ""
-                    } ${member.role === "CREATOR"
+                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${editMode && member.role !== "CREATOR" ? "cursor-pointer" : ""
+                      } ${member.role === "CREATOR"
                         ? "border-purple-200 bg-purple-50 hover:bg-purple-100"
                         : member.role === "LEADER"
                           ? "border-yellow-200 bg-yellow-50 hover:bg-yellow-100"
@@ -1088,10 +1400,10 @@ export default function ProjectDetailsPage() {
                       )}
                       <div
                         className={`h-12 w-12 rounded-full flex items-center justify-center ${member.role === "CREATOR"
-                            ? "bg-purple-100 text-purple-700"
-                            : member.role === "LEADER"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-blue-100 text-blue-700"
+                          ? "bg-purple-100 text-purple-700"
+                          : member.role === "LEADER"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-blue-100 text-blue-700"
                           }`}
                       >
                         {member.role === "CREATOR" ? (
@@ -1134,10 +1446,10 @@ export default function ProjectDetailsPage() {
                     <div className="flex items-center space-x-2">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${member.role === "CREATOR"
-                            ? "bg-purple-100 text-purple-800 border-purple-200"
-                            : member.role === "LEADER"
-                              ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                              : "bg-blue-100 text-blue-800 border-blue-200"
+                          ? "bg-purple-100 text-purple-800 border-purple-200"
+                          : member.role === "LEADER"
+                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            : "bg-blue-100 text-blue-800 border-blue-200"
                           }`}
                       >
                         {member.role}
@@ -1190,64 +1502,7 @@ export default function ProjectDetailsPage() {
         )}
 
         {/* Danger Zone - Only show in edit mode */}
-        {editMode && (
-          <Card className="mt-8 shadow-xl border-0 bg-red-50/80 backdrop-blur-sm border-red-200">
-            <CardHeader className="border-b border-red-200 bg-gradient-to-r from-red-50 to-red-100">
-              <CardTitle className="flex items-center text-xl text-red-900">
-                <svg className="h-5 w-5 mr-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-                Danger Zone
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="border border-red-300 rounded-lg p-6 bg-red-50">
-                <div className="flex items-start space-x-3">
-                  <svg className="h-6 w-6 text-red-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                    />
-                  </svg>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-red-900 mb-2">Delete Project</h3>
-                    <p className="text-sm text-red-700 mb-4">
-                      Deletion requires activation by the project creator. Once deleted, the project will become unavailable to all members.
-                    </p>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-red-700 mb-2 block">
-                          Type the project name "<strong>{projectDetails.projectName}</strong>" to confirm:
-                        </label>
-                        <Input
-                          value={deleteConfirmationText}
-                          onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                          placeholder={projectDetails.projectName}
-                          className="border-red-300 focus:border-red-500 focus:ring-red-500 bg-white"
-                        />
-                      </div>
-                      <Button
-                        variant="destructive"
-                        onClick={handleDeleteProject}
-                        disabled={deleteConfirmationText !== projectDetails.projectName || uploading}
-                        className="w-full"
-                      >
-                        {uploading ? "Deleting..." : "I understand the consequences, delete this project"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {renderDangerZone()}
       </div>
 
       <Dialog open={alertOpen} onOpenChange={setAlertOpen}>
@@ -1285,6 +1540,16 @@ export default function ProjectDetailsPage() {
             <div className="space-y-3 px-6 py-4 bg-slate-50 rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-slate-700">Uploading files...</span>
+                <span className="text-sm font-semibold text-blue-600">{Math.round(uploadProgress)}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-3" />
+            </div>
+          )}
+
+          {inviteLoading && (
+            <div className="space-y-3 px-6 py-4 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">Inviting users...</span>
                 <span className="text-sm font-semibold text-blue-600">{Math.round(uploadProgress)}%</span>
               </div>
               <Progress value={uploadProgress} className="h-3" />
