@@ -37,7 +37,7 @@ export default function ProjectDetailsPage() {
   const [searchEmail, setSearchEmail] = useState("")
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [selectedUsersToAdd, setSelectedUsersToAdd] = useState<string[]>([])
+  const [selectedUsersToAdd, setSelectedUsersToAdd] = useState<User[]>([])
   const [inviteLoading, setInviteLoading] = useState(false)
 
   // Inline editing states
@@ -337,8 +337,8 @@ export default function ProjectDetailsPage() {
     if (!projectId || selectedUsersToAdd.length === 0) return
     try {
       setInviteLoading(true)
-      const usersToAdd : InvitationUser[] = searchResults.filter(user => selectedUsersToAdd.includes(user.email))
-                                      .map(user => ({ ...user, role: "MEMBER", userId: user.id }))
+      const usersToAdd: InvitationUser[] = selectedUsersToAdd
+        .map(user => ({ ...user, role: "MEMBER", userId: user.id }))
       await projectApi.inviteUsersToProject(projectId, usersToAdd)
       await fetchProjectDetails(projectId)
 
@@ -362,24 +362,6 @@ export default function ProjectDetailsPage() {
       setEditMode(false)
     }
   }
-
-  // const handleAddMember = async (user: User) => {
-  //   if (!projectId) return
-  //   try {
-  //     await memberApi.addMember(projectId, email)
-  //     await fetchProjectDetails(projectId)
-  //     setAlertType("success")
-  //     setAlertTitle("Member Added")
-  //     setAlertMessage("Member has been added successfully!")
-  //     setAlertOpen(true)
-  //   } catch (err) {
-  //     const apiError = err as ApiError
-  //     setAlertType("error")
-  //     setAlertTitle("Add Member Error")
-  //     setAlertMessage(apiError.message || "Failed to add member")
-  //     setAlertOpen(true)
-  //   }
-  // }
 
   const handleRemoveMembers = async (members: string[]) => {
     if (!projectId) return
@@ -516,9 +498,8 @@ export default function ProjectDetailsPage() {
       setIsSearching(true);
       try {
         const results = await memberApi.searchUsers(searchTerm);
-        console.log("Search results:", JSON.stringify(results.data));
         setSearchResults(results.data);
-        
+
       } catch (error) {
         console.error('Error searching users:', error);
         setSearchResults([]);
@@ -883,12 +864,13 @@ export default function ProjectDetailsPage() {
   }
 
   // Add this function before the return statement
-  const handleToggleUserSelection = (email: string) => {
-    setSelectedUsersToAdd(prev =>
-      prev.includes(email)
-        ? prev.filter(e => e !== email)
-        : [...prev, email]
-    )
+  const handleToggleUserSelection = (user: User) => {
+    setSelectedUsersToAdd(prev => {
+      const exists = prev.some(u => u.email === user.email)
+      return exists
+        ? prev.filter(u => u.email !== user.email)
+        : [...prev, user]
+    })
   }
 
   return (
@@ -1303,12 +1285,12 @@ export default function ProjectDetailsPage() {
                           <div
                             key={user.email}
                             className="flex items-center justify-between p-3 hover:bg-slate-50"
-                            onClick={() => !isExistingMember && handleToggleUserSelection(user.email)}
+                            onClick={() => !isExistingMember && handleToggleUserSelection(user)}
                           >
                             <div className="flex items-center space-x-3">
                               <Checkbox
-                                checked={selectedUsersToAdd.includes(user.email)}
-                                onCheckedChange={() => !isExistingMember && handleToggleUserSelection(user.email)}
+                                checked={selectedUsersToAdd.includes(user)}
+                                onCheckedChange={() => !isExistingMember && handleToggleUserSelection(user)}
                                 disabled={isExistingMember}
                                 onClick={(e) => e.stopPropagation()}
                               />
@@ -1328,19 +1310,18 @@ export default function ProjectDetailsPage() {
                               </div>
                             </div>
                             <span
-                              className={`px-3 py-1 text-sm rounded-full ${
-                                isExistingMember
-                                  ? "bg-gray-100 text-gray-600"
-                                  : selectedUsersToAdd.includes(user.email)
+                              className={`px-3 py-1 text-sm rounded-full ${isExistingMember
+                                ? "bg-gray-100 text-gray-600"
+                                : selectedUsersToAdd.includes(user)
                                   ? "bg-blue-100 text-blue-700"
                                   : "bg-slate-100 text-slate-600"
-                              }`}
+                                }`}
                             >
-                              {isExistingMember 
-                                ? "Already Member" 
-                                : selectedUsersToAdd.includes(user.email)
-                                ? "Selected"
-                                : "Available"}
+                              {isExistingMember
+                                ? "Already Member"
+                                : selectedUsersToAdd.includes(user)
+                                  ? "Selected"
+                                  : "Available"}
                             </span>
                           </div>
                         );
