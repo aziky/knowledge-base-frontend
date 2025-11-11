@@ -33,9 +33,9 @@ export const chatApi = {
     }
   },
 
-  getConversations: async () => {
+  getConversations: async (projectId : string) => {
     try {
-      const response = await chatServiceClient.get(`/chat`);
+      const response = await chatServiceClient.get(`/chat?projectId=${projectId}`);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
