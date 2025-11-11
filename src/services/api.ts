@@ -33,9 +33,9 @@ export const chatApi = {
     }
   },
 
-  getConversations: async () => {
+  getConversations: async (projectId : string) => {
     try {
-      const response = await chatServiceClient.get(`/chat`);
+      const response = await chatServiceClient.get(`/chat?projectId=${projectId}`);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -547,14 +547,17 @@ export const projectApi = {
     try {
 
 
-      const response = await projectServiceClient.get(`/project/download/${fileId}?type=${fileType}`, {
-        responseType: 'blob', // Important for file downloads
-        timeout: 180000, // 3 minutes for large files
+      const response = await projectServiceClient.get(`/project/download/${fileId}?type=${fileType}`);
+      console.log('Download file response:', JSON.stringify(response.data.data));
+      const presignedUrl = response.data.data.presignedUrl;
+      console.log('Presigned URL:', presignedUrl);
+      // Step 2: Fetch the actual file from S3
+      const fileResponse = await axios.get(presignedUrl, {
+        responseType: 'blob', // Important to get binary data
       });
 
-      const presignedUrl = response.data.presignedUrl;
-      const blob = new Blob([presignedUrl]);
-      const url = window.URL.createObjectURL(blob);
+      // Step 3: Create a download link
+      const url = window.URL.createObjectURL(fileResponse.data);
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;

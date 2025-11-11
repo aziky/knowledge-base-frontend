@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { projectApi, userApi, type ApiError, type CreateProjectRequest } from "@/services/api"
-import type { InvitationUser, User } from "@/types"
+import type { User } from "@/types"
 
 export default function CreateProjectPage() {
     const navigate = useNavigate()
@@ -19,57 +19,76 @@ export default function CreateProjectPage() {
     const [allUsers, setAllUsers] = useState<User[]>([]) // Store all users fetched initially
     const [availableMembers, setAvailableMembers] = useState<User[]>([])
     const [selectedMembers, setSelectedMembers] = useState<User[]>([])
-
-    // Load all users initially
-    const loadAllUsers = useCallback(async () => {
-        setSearchLoading(true)
+    // Get current user from localStorage
+    const currentUser = useMemo(() => {
         try {
-            const users = await userApi.searchUsers("") // Get all users
-            setAllUsers(users)
-            setAvailableMembers(users) // Initially show all users
+            const userData = localStorage.getItem("userData");
+            return userData ? JSON.parse(userData) : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const loadAllUsers = async () => {
+        setSearchLoading(true);
+        try {
+            const users = await userApi.searchUsers("");
+
+            const filteredUsers = users.filter(
+                (u) => u.email !== currentUser?.email
+            );
+
+            console.log(
+                "Loaded users for invitation:",
+                JSON.stringify(filteredUsers)
+            );
+
+            setAllUsers(filteredUsers);
+            setAvailableMembers(filteredUsers); // Initially show all except current user
         } catch (err) {
-            console.error("Error loading users:", err)
-            setAllUsers([])
-            setAvailableMembers([])
+            console.error("Error loading users:", err);
+            setAllUsers([]);
+            setAvailableMembers([]);
         } finally {
-            setSearchLoading(false)
+            setSearchLoading(false);
         }
-    }, [])
+    };
 
-    // Filter users based on search term and selected members
-    const filterUsers = useCallback(() => {
-        let filteredUsers = allUsers
+    useEffect(() => {
+        let filteredUsers = allUsers;
 
-        // Filter by search term if provided
         if (memberSearch.trim()) {
-            filteredUsers = allUsers.filter(user =>
-                user.fullName?.toLowerCase().includes(memberSearch.toLowerCase()) ||
-                user.email.toLowerCase().includes(memberSearch.toLowerCase())
-            )
+            filteredUsers = allUsers.filter(
+                (user) =>
+                    user.fullName?.toLowerCase().includes(memberSearch.toLowerCase()) ||
+                    user.email.toLowerCase().includes(memberSearch.toLowerCase())
+            );
         }
 
-        // Filter out already selected members
-        filteredUsers = filteredUsers.filter(user =>
-            !selectedMembers.some(selected => selected.id === user.id)
-        )
+        filteredUsers = filteredUsers.filter(
+            (user) =>
+                !selectedMembers.some((selected) => selected.id === user.id) &&
+                user.id !== currentUser?.id
+        );
 
-        setAvailableMembers(filteredUsers)
-    }, [allUsers, memberSearch, selectedMembers])
+        // ✅ Only update if different, to prevent infinite loop
+        setAvailableMembers((prev) => {
+            const isSame =
+                prev.length === filteredUsers.length &&
+                prev.every((u, i) => u.id === filteredUsers[i].id);
 
-    // Load initial users on component mount
+            return isSame ? prev : filteredUsers;
+        });
+    }, [allUsers, memberSearch, selectedMembers, currentUser]);
+
     useEffect(() => {
-        loadAllUsers()
-    }, [loadAllUsers])
-
-    // Filter users when search term or selected members change
-    useEffect(() => {
-        filterUsers()
-    }, [filterUsers])
+        loadAllUsers();
+    }, []); // Only run once on mount
 
     const addMember = (user: User) => {
-        setSelectedMembers(prev => [...prev, user])
-        // No need to manually filter availableMembers - useEffect will handle it
-    }
+        if (user.id === currentUser?.id) return;
+        setSelectedMembers((prev) => [...prev, user]);
+    };
 
     const removeMember = (userId: string) => {
         setSelectedMembers(prev => prev.filter(u => u.id !== userId))
@@ -95,25 +114,6 @@ export default function CreateProjectPage() {
             }
 
             const newProject = await projectApi.createProject(projectData)
-            console.log('Project created:', JSON.stringify(newProject))
-            // Step 2: Send invitations if there are selected members
-            if (selectedMembers.length > 0) {
-                try {
-                    const invitationUsers: InvitationUser[] = selectedMembers.map(member => ({
-                        userId: member.id,
-                        fullName: member.fullName,
-                        email: member.email,
-                        role: "MEMBER"
-                    }));
-                    console.log('Inviting users:', JSON.stringify(invitationUsers));
-                    const invitationsResponse =  await projectApi.inviteUsersToProject(newProject.projectId, invitationUsers)
-                    console.log('Invitations sent:', invitationsResponse)
-                } catch (inviteError) {
-                    console.warn('Project created but failed to send some invitations:', inviteError)
-                }
-            }
-
-            // Navigate to the new project's details page
             navigate(`/project/${newProject.projectId}`)
         } catch (err) {
             const apiError = err as ApiError
@@ -235,29 +235,32 @@ export default function CreateProjectPage() {
                                 <div className="space-y-2">
                                     <h4 className="text-sm font-medium text-slate-700">Available Members</h4>
                                     <div className="max-h-40 overflow-y-auto space-y-2 border border-slate-200 rounded-lg p-3">
-                                        {availableMembers.map((user) => (
-                                            <div key={user.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                                        <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                        </svg>
+                                        {availableMembers
+                                            .filter(user => user.id !== currentUser?.id) // Ensure current user is not shown
+                                            .map((user) => (
+                                                <div key={user.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
+                                                    <div className="flex items-center space-x-3">
+                                                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                            <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-slate-900">{user.fullName || user.email}</p>
+                                                            <p className="text-sm text-slate-500">{user.email}</p>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="font-medium text-slate-900">{user.fullName || user.email}</p>
-                                                        <p className="text-sm text-slate-500">{user.email}</p>
-                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        onClick={() => addMember(user)}
+                                                        className="h-8"
+                                                        disabled={user.id === currentUser?.id} // Safeguard
+                                                    >
+                                                        Add
+                                                    </Button>
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    onClick={() => addMember(user)}
-                                                    className="h-8"
-                                                >
-                                                    Add
-                                                </Button>
-                                            </div>
-                                        ))}
+                                            ))}
                                     </div>
                                 </div>
                             )}

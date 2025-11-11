@@ -75,7 +75,7 @@ export function ChatPanel({ projectId, selectedFiles, conversationId: externalCo
     const loadConversations = async () => {
       setIsLoadingConversations(true)
       try {
-        const response = await chatApi.getConversations()
+        const response = await chatApi.getConversations(projectId)
         console.log("getting all conversation: " + JSON.stringify(response));
         
         setConversations(response.conversations || [])

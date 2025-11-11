@@ -42,7 +42,7 @@ export function ConversationHistory({
       setIsLoading(true)
       try {
         // Adjust this API call based on your actual API structure
-        const response: ConversationHistoryResponse = await chatApi.getConversations()
+        const response: ConversationHistoryResponse = await chatApi.getConversations(projectId)
         console.log("Loaded conversations:", JSON.stringify(response))
         setConversations(response.conversations)
       } catch (error) {
