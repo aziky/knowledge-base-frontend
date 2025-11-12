@@ -6,6 +6,7 @@ import { authApi } from "@/services/api"
 import HomePage from "@/pages/home/HomePage"
 import ProjectDetailsPage from "@/pages/project/ProjectDetailsPage"
 import CreateProjectPage from "@/pages/project/CreateProjectPage"
+import AdminDashboardPage from "@/pages/admin/AdminDashboardPage"
 import type { User } from "@/types"
 
 function App() {
@@ -105,14 +106,14 @@ function App() {
           }
         />
 
-        {/* Create project route */}
+        {/* Admin dashboard route */}
         <Route
-          path="/create-project"
+          path="/admin-dashboard"
           element={
-            isAuthenticated ? (
-              <CreateProjectPage />
+            isAuthenticated && user?.role === "ADMIN" ? (
+              <AdminDashboardPage user={user} onLogout={handleLogout} />
             ) : (
-              <Navigate to="/login" replace />
+              <Navigate to={isAuthenticated ? "/" : "/login"} replace />
             )
           }
         />

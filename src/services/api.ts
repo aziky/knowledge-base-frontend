@@ -13,13 +13,7 @@ const chatServiceClient = axios.create({
 export const chatApi = {
   ask: async (payload: { project_id?: string; document_ids: string[]; video_ids: string[]; question: string; conversation_id?: string | null }) => {
     try {
-      // If document_ids or video_ids is not empty, remove project_id from payload
       const sendPayload = { ...payload };
-      if ((sendPayload.document_ids && sendPayload.document_ids.length > 0) ||
-        (sendPayload.video_ids && sendPayload.video_ids.length > 0)) {
-        delete sendPayload.project_id;
-      }
-      console.log('Chat ask payload:', JSON.stringify(sendPayload));
       const response = await chatServiceClient.post('/chat', sendPayload);
       return response.data;
     } catch (error) {
@@ -585,11 +579,11 @@ export const projectApi = {
 // User API functions (user-service)
 export const userApi = {
   // Search users by name or email
-  searchUsers: async (searchTerm: string): Promise<User[]> => {
+  searchUsers: async (searchTerm?: string): Promise<User[]> => {
     try {
       console.log('Searching users with term:', searchTerm);
 
-      const endpoint = searchTerm.trim()
+      const endpoint = searchTerm?.trim()
         ? `/user?name=${encodeURIComponent(searchTerm)}`
         : `/user`;
 
