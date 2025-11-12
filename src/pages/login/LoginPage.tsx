@@ -48,7 +48,7 @@ const LoginPage: React.FC<LoginProps> = ({ onLoginSuccess, onLoginError }) => {
       const userData: User = {
         id: response.email, // Using email as ID since backend doesn't provide separate ID
         email: response.email,
-        name: response.fullName,
+        fullName: response.fullName,
         role: response.role
       };
 
@@ -63,6 +63,10 @@ const LoginPage: React.FC<LoginProps> = ({ onLoginSuccess, onLoginError }) => {
 
       // Navigate to main page (React Router will handle this automatically via App.tsx)
       console.log('Login successful!', userData);
+      if (userData.role === 'ADMIN') {
+        navigate('/admin-dashboard');
+        return;
+      }
       navigate('/');
     } catch (err) {
       const apiError = err as ApiError;

@@ -579,11 +579,11 @@ export const projectApi = {
 // User API functions (user-service)
 export const userApi = {
   // Search users by name or email
-  searchUsers: async (searchTerm: string): Promise<User[]> => {
+  searchUsers: async (searchTerm?: string): Promise<User[]> => {
     try {
       console.log('Searching users with term:', searchTerm);
 
-      const endpoint = searchTerm.trim()
+      const endpoint = searchTerm?.trim()
         ? `/user?name=${encodeURIComponent(searchTerm)}`
         : `/user`;
 

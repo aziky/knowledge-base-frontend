@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  kb_frontend:
+    container_name: kb_frontend
+    image: my-frontend:latest
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+    networks:
+      - kb_network
+networks:
+  kb_network:
+    external: true
